@@ -58,7 +58,8 @@
     const { useState, useRef, useEffect, useCallback } = React;
 
     // ─── CONFIG ──────────────────────────────────────────────────────────────
-    const MODEL = "claude-sonnet-4-20250514";
+    const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+    const OPENAI_MODEL    = "gpt-4o";
 
     const PLATFORMS = {
       ebay:      { name: "eBay EU",   color: "#e53238", emoji: "🛒" },
@@ -81,19 +82,7 @@
     };
 
     // ─── VISION ──────────────────────────────────────────────────────────────
-    async function analyzeImage(base64, apiKey) {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-calls": "true",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 800,
-          system: `You are an expert fashion/product identifier for a thrift reselling app. Analyze the image and return ONLY valid JSON with these fields:
+    const VISION_PROMPT = `You are an expert fashion/product identifier for a thrift reselling app. Analyze the image and return ONLY valid JSON with these fields:
 {
   "brand": "brand name or null",
   "category": "clothing|shoes|bag|accessory|electronics|other",
@@ -110,19 +99,63 @@
   "is_streetwear_sneaker": false
 }
 If no item is clearly visible: {"error":"no_item"}
-Return ONLY JSON, no markdown.`,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-              { type: "text", text: "Identify this item for resale pricing. JSON only." }
-            ]
-          }]
-        })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message || "Vision API error");
-      const text = (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
+Return ONLY JSON, no markdown.`;
+
+    async function analyzeImage(base64, apiKey, provider) {
+      let res, data, text;
+
+      if (provider === "openai") {
+        // ── OpenAI GPT-4o ──────────────────────────────────────────────────
+        res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: OPENAI_MODEL,
+            max_tokens: 800,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: VISION_PROMPT + "\n\nIdentify this item for resale pricing. JSON only." },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}`, detail: "low" } },
+              ]
+            }]
+          })
+        });
+        data = await res.json();
+        if (data.error) throw new Error(data.error.message || "OpenAI Vision error");
+        text = (data.choices?.[0]?.message?.content || "{}").replace(/```json|```/g, "").trim();
+
+      } else {
+        // ── Anthropic Claude ───────────────────────────────────────────────
+        res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-calls": "true",
+          },
+          body: JSON.stringify({
+            model: ANTHROPIC_MODEL,
+            max_tokens: 800,
+            system: VISION_PROMPT,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+                { type: "text", text: "Identify this item for resale pricing. JSON only." }
+              ]
+            }]
+          })
+        });
+        data = await res.json();
+        if (data.error) throw new Error(data.error.message || "Anthropic Vision error");
+        text = (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
+      }
+
       return JSON.parse(text);
     }
 
@@ -253,7 +286,7 @@ Return ONLY JSON, no markdown.`,
       const timerRef  = useRef(null);
 
       const [screen, setScreen]       = useState("setup");   // setup | cam | result | history
-      const [cfg, setCfg]             = useState({ anthropicKey:"", apifyToken:"", interval:3, autoScan:true });
+      const [cfg, setCfg]             = useState({ provider:"openai", apiKey:"", apifyToken:"", interval:3, autoScan:true });
       const [platforms, setPlatforms] = useState(Object.keys(PLATFORMS));
       const [camReady, setCamReady]   = useState(false);
       const [busy, setBusy]           = useState(false);
@@ -308,7 +341,7 @@ Return ONLY JSON, no markdown.`,
 
         try {
           setProgress("🔍 Identifying item...");
-          const identified = await analyzeImage(b64, cfg.anthropicKey);
+          const identified = await analyzeImage(b64, cfg.apiKey, cfg.provider);
 
           if (identified.error || (!identified.brand && !identified.subcategory)) {
             setBusy(false);
@@ -468,11 +501,32 @@ Return ONLY JSON, no markdown.`,
               <div style={S.h2}>Configuration</div>
 
               <div style={S.card}>
-                <label style={S.lbl}>Anthropic API Key (required)</label>
-                <p style={S.hint}>Your Claude API key for image recognition. Get one at console.anthropic.com</p>
-                <input style={S.inp} type="password" placeholder="sk-ant-api03-..."
-                  value={cfg.anthropicKey}
-                  onChange={e => setCfg(c => ({ ...c, anthropicKey: e.target.value }))}
+                <label style={S.lbl}>Vision Provider</label>
+                <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                  {[
+                    { id:"openai",    label:"OpenAI GPT-4o",     hint:"sk-..." },
+                    { id:"anthropic", label:"Anthropic Claude",   hint:"sk-ant-..." },
+                  ].map(p => (
+                    <button key={p.id} onClick={() => setCfg(c => ({ ...c, provider: p.id }))} style={{
+                      flex:1, padding:"10px 8px", borderRadius:8, border:"1px solid",
+                      cursor:"pointer", fontSize:11, fontFamily:"inherit", transition:"all 0.2s",
+                      background: cfg.provider===p.id ? "#00ff8720" : "transparent",
+                      borderColor: cfg.provider===p.id ? "#00ff87" : "#333",
+                      color: cfg.provider===p.id ? "#00ff87" : "#555",
+                      letterSpacing:1,
+                    }}>{p.label}</button>
+                  ))}
+                </div>
+                <label style={S.lbl}>API Key</label>
+                <p style={S.hint}>
+                  {cfg.provider === "openai"
+                    ? "Get yours at platform.openai.com → API keys. ~$0.01 per scan with GPT-4o."
+                    : "Get yours at console.anthropic.com. ~$0.003 per scan with Claude Sonnet."}
+                </p>
+                <input style={S.inp} type="password"
+                  placeholder={cfg.provider === "openai" ? "sk-proj-..." : "sk-ant-api03-..."}
+                  value={cfg.apiKey}
+                  onChange={e => setCfg(c => ({ ...c, apiKey: e.target.value }))}
                 />
               </div>
 
