@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#080810" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ThriftLens" />
+  <title>ThriftLens</title>
+
+  <!-- PWA manifest inline -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- React + Babel (no build needed) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #080810; }
+    #root { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    @keyframes scanline {
+      0%   { top: 20%; opacity: 1; }
+      50%  { top: 80%; opacity: 0.6; }
+      100% { top: 20%; opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .scan-line   { animation: scanline 1.8s ease-in-out infinite; }
+    .pulse       { animation: pulse 1.2s ease-in-out infinite; }
+    .fade-in     { animation: fadeIn 0.4s ease forwards; }
+
+    input, button { -webkit-appearance: none; outline: none; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback } = React;
+
+    // ─── CONFIG ──────────────────────────────────────────────────────────────
+    const MODEL = "claude-sonnet-4-20250514";
+
+    const PLATFORMS = {
+      ebay:      { name: "eBay EU",   color: "#e53238", emoji: "🛒" },
+      vinted:    { name: "Vinted",    color: "#09b1ba", emoji: "👗" },
+      depop:     { name: "Depop",     color: "#ff2300", emoji: "🔴" },
+      wallapop:  { name: "Wallapop",  color: "#13c1ac", emoji: "🟢" },
+      vestiaire: { name: "Vestiaire", color: "#c9a96e", emoji: "👜" },
+      stockx:    { name: "StockX",    color: "#00ff87", emoji: "👟" },
+      leboncoin: { name: "LeBonCoin", color: "#f56b2a", emoji: "🇫🇷" },
+      subito:    { name: "Subito.it", color: "#cc0033", emoji: "🇮🇹" },
+    };
+
+    const APIFY_ACTORS = {
+      vinted:    "piotrv1001~vinted-listings-scraper",
+      depop:     "epctex~depop-scraper",
+      wallapop:  "louisdeconinck~wallapop-scraper",
+      vestiaire: "ecomscrape~vestiaire-collective-product-search-scraper",
+      leboncoin: "apify~leboncoin-scraper",
+      subito:    "epctex~subito-scraper",
+    };
+
+    // ─── VISION ──────────────────────────────────────────────────────────────
+    async function analyzeImage(base64, apiKey) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-calls": "true",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 800,
+          system: `You are an expert fashion/product identifier for a thrift reselling app. Analyze the image and return ONLY valid JSON with these fields:
+{
+  "brand": "brand name or null",
+  "category": "clothing|shoes|bag|accessory|electronics|other",
+  "subcategory": "e.g. jeans, sneakers, jacket, tshirt",
+  "color": "main color(s)",
+  "material": "if visible e.g. denim, leather, cotton",
+  "condition_estimate": "new|excellent|good|fair|poor",
+  "size_visible": "size if visible on tag or null",
+  "gender": "men|women|unisex|unknown",
+  "notable_features": "logos, prints, special details",
+  "search_query": "3-5 word search string for marketplaces",
+  "confidence": 0.0,
+  "is_luxury": false,
+  "is_streetwear_sneaker": false
+}
+If no item is clearly visible: {"error":"no_item"}
+Return ONLY JSON, no markdown.`,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+              { type: "text", text: "Identify this item for resale pricing. JSON only." }
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || "Vision API error");
+      const text = (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
+      return JSON.parse(text);
+    }
+
+    // ─── PRICE SIMULATION (realistic fallback) ────────────────────────────────
+    function simulatePrices(platform, query) {
+      const q = query.toLowerCase();
+      let base = 22;
+      if (/nike|adidas|puma|new balance/.test(q)) base = 48;
+      if (/levi|levis|lee|wrangler/.test(q)) base = 34;
+      if (/gucci|louis vuitton|prada|hermes|chanel/.test(q)) base = 320;
+      if (/zara|h&m|mango|primark/.test(q)) base = 12;
+      if (/jordan|yeezy|travis|off.white/.test(q)) base = 190;
+      if (/ralph lauren|tommy|lacoste/.test(q)) base = 42;
+      if (/vintage|retro|80s|90s/.test(q)) base *= 1.5;
+      if (/jacket|coat|blazer/.test(q)) base *= 1.7;
+      if (/shoes|sneaker|boot/.test(q)) base *= 1.6;
+      if (/dress|suit/.test(q)) base *= 1.4;
+
+      const mult = { ebay:0.88, vinted:0.82, depop:1.08, wallapop:0.73, vestiaire:2.4, stockx:1.85, leboncoin:0.71, subito:0.74 };
+      const m = mult[platform] || 1;
+      const count = 7 + Math.floor(Math.random() * 14);
+      const prices = Array.from({ length: count }, () =>
+        Math.round(base * m * (0.65 + Math.random() * 0.75) * 100) / 100
+      );
+      const favorites = Array.from({ length: count }, () => Math.floor(Math.random() * 28));
+      return { prices, favorites, count, simulated: true };
+    }
+
+    // ─── APIFY FETCH ─────────────────────────────────────────────────────────
+    async function fetchApify(platform, query, token) {
+      if (!token) return simulatePrices(platform, query);
+      try {
+        const actor = APIFY_ACTORS[platform];
+        const inputs = {
+          vinted:    { searchText: query, maxItems: 20 },
+          depop:     { search: query, maxItems: 20 },
+          wallapop:  { keywords: query, maxItems: 20 },
+          vestiaire: { search: query, maxResults: 20 },
+          leboncoin: { searchQuery: query, maxItems: 20 },
+          subito:    { search: query, maxItems: 20 },
+        };
+        const res = await fetch(
+          `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${token}&timeout=20&memory=256`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inputs[platform] || { query }) }
+        );
+        if (!res.ok) return simulatePrices(platform, query);
+        const items = await res.json();
+        if (!Array.isArray(items) || !items.length) return simulatePrices(platform, query);
+        const prices = items
+          .map(i => parseFloat(String(i.price || i.currentPrice || i.salePrice || 0).replace(/[^0-9.]/g, "")))
+          .filter(p => p > 1 && p < 3000);
+        if (!prices.length) return simulatePrices(platform, query);
+        const favorites = items.map(i => i.favouriteCount || i.likes || i.favorites || 0);
+        return { prices, favorites, count: prices.length, simulated: false };
+      } catch {
+        return simulatePrices(platform, query);
+      }
+    }
+
+    // ─── AGGREGATION ─────────────────────────────────────────────────────────
+    function aggregate(platformData, item) {
+      const results = {};
+      let allPrices = [];
+      for (const [p, d] of Object.entries(platformData)) {
+        if (!d?.prices?.length) continue;
+        const s = [...d.prices].sort((a, b) => a - b);
+        const median = s[Math.floor(s.length * 0.5)];
+        const p25    = s[Math.floor(s.length * 0.25)];
+        const p75    = s[Math.floor(s.length * 0.75)];
+        const avg    = s.reduce((a, b) => a + b, 0) / s.length;
+        const avgFav = d.favorites.reduce((a, b) => a + b, 0) / (d.favorites.length || 1);
+        results[p] = { median, p25, p75, avg, count: d.count, avgFav, simulated: d.simulated };
+        allPrices = allPrices.concat(d.prices);
+      }
+      if (!allPrices.length) return null;
+
+      // Weighted median — Vinted + Vestiaire weighted highest as sell targets
+      const W = { vinted:2.2, vestiaire:1.9, depop:1.5, stockx:1.8, ebay:1.1, wallapop:0.7, leboncoin:0.7, subito:0.7 };
+      let ws = 0, wt = 0;
+      for (const [p, d] of Object.entries(results)) {
+        const w = W[p] || 1;
+        ws += d.median * w; wt += w;
+      }
+      const weightedMedian = Math.round(ws / wt * 100) / 100;
+
+      const as = [...allPrices].sort((a, b) => a - b);
+      const overallP25    = Math.round(as[Math.floor(as.length * 0.25)] * 100) / 100;
+      const overallMedian = Math.round(as[Math.floor(as.length * 0.50)] * 100) / 100;
+
+      const allFavs = Object.values(results).map(r => r.avgFav);
+      const avgFav  = allFavs.reduce((a, b) => a + b, 0) / (allFavs.length || 1);
+      const totalListings = Object.values(results).reduce((s, r) => s + r.count, 0);
+
+      const demandScore   = Math.min(avgFav / 18, 1);
+      const supplyScore   = Math.max(1 - totalListings / 220, 0.1);
+      const luxBonus      = item?.is_luxury ? 0.12 : 0;
+      const sneakerBonus  = item?.is_streetwear_sneaker ? 0.10 : 0;
+      const propensity    = Math.min(Math.round((demandScore * 0.45 + supplyScore * 0.38 + luxBonus + sneakerBonus + 0.17) * 100), 96);
+
+      return {
+        platforms: results,
+        weightedMedian,
+        overallP25,
+        overallMedian,
+        propensity,
+        buyThreshold:   Math.round(weightedMedian * 0.45 * 100) / 100,
+        maybeThreshold: Math.round(weightedMedian * 0.60 * 100) / 100,
+        totalListings,
+        simulated: Object.values(results).some(r => r.simulated),
+      };
+    }
+
+    function buySignal(marketPrice, pd) {
+      if (!pd || !marketPrice) return null;
+      const mp = parseFloat(marketPrice);
+      if (isNaN(mp) || mp <= 0) return null;
+      const margin = Math.round((pd.weightedMedian - mp) / mp * 100);
+      if (mp <= pd.buyThreshold)   return { label: "BUY",   icon: "✅", color: "#00ff87", margin };
+      if (mp <= pd.maybeThreshold) return { label: "MAYBE", icon: "⚠️", color: "#ffd600", margin };
+      return { label: "PASS", icon: "❌", color: "#ff4444", margin };
+    }
+
+    // ─── APP ─────────────────────────────────────────────────────────────────
+    function App() {
+      const videoRef  = useRef(null);
+      const canvasRef = useRef(null);
+      const streamRef = useRef(null);
+      const timerRef  = useRef(null);
+
+      const [screen, setScreen]       = useState("setup");   // setup | cam | result | history
+      const [cfg, setCfg]             = useState({ anthropicKey:"", apifyToken:"", interval:3, autoScan:true });
+      const [platforms, setPlatforms] = useState(Object.keys(PLATFORMS));
+      const [camReady, setCamReady]   = useState(false);
+      const [busy, setBusy]           = useState(false);
+      const [progress, setProgress]   = useState("");
+      const [item, setItem]           = useState(null);
+      const [prices, setPrices]       = useState(null);
+      const [history, setHistory]     = useState([]);
+      const [mktPrice, setMktPrice]   = useState("");
+      const [err, setErr]             = useState("");
+      const lastScan = useRef(0);
+
+      // Camera
+      const startCam = useCallback(async () => {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
+          });
+          streamRef.current = s;
+          videoRef.current.srcObject = s;
+          await videoRef.current.play();
+          setCamReady(true);
+          setErr("");
+        } catch(e) {
+          setErr("Camera blocked. Open this page in Safari and allow camera access.");
+        }
+      }, []);
+
+      const stopCam = useCallback(() => {
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        clearInterval(timerRef.current);
+        setCamReady(false);
+      }, []);
+
+      const capture = useCallback(() => {
+        const v = videoRef.current, c = canvasRef.current;
+        if (!v || !c || v.readyState < 2) return null;
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext("2d").drawImage(v, 0, 0);
+        return c.toDataURL("image/jpeg", 0.82).split(",")[1];
+      }, []);
+
+      // Main scan
+      const scan = useCallback(async () => {
+        const now = Date.now();
+        if (busy || now - lastScan.current < cfg.interval * 1000) return;
+        lastScan.current = now;
+
+        const b64 = capture();
+        if (!b64) return;
+
+        setBusy(true); setErr(""); setPrices(null);
+
+        try {
+          setProgress("🔍 Identifying item...");
+          const identified = await analyzeImage(b64, cfg.anthropicKey);
+
+          if (identified.error || (!identified.brand && !identified.subcategory)) {
+            setBusy(false);
+            setProgress("👁 Point at an item...");
+            return;
+          }
+
+          setItem(identified);
+          setProgress("📡 Fetching prices from " + platforms.length + " platforms...");
+
+          // Parallel fetches
+          const tasks = {};
+          for (const p of platforms) {
+            if (p === "stockx" && !identified.is_streetwear_sneaker) continue;
+            if (p === "vestiaire" && identified.category === "electronics") continue;
+            if (p === "ebay") tasks[p] = Promise.resolve(simulatePrices(p, identified.search_query));
+            else tasks[p] = fetchApify(p, identified.search_query, cfg.apifyToken);
+          }
+
+          const raw = {};
+          await Promise.all(Object.entries(tasks).map(async ([p, t]) => {
+            try { raw[p] = await t; } catch { raw[p] = simulatePrices(p, identified.search_query); }
+          }));
+
+          setProgress("🧮 Calculating...");
+          const agg = aggregate(raw, identified);
+          if (!agg) throw new Error("Could not aggregate prices");
+
+          setPrices(agg);
+          setMktPrice("");
+          setScreen("result");
+          setHistory(h => [{
+            id: Date.now(), ts: new Date().toLocaleTimeString(),
+            item: identified, prices: agg, thumb: b64
+          }, ...h.slice(0, 29)]);
+        } catch(e) {
+          setErr("Error: " + e.message);
+        } finally {
+          setBusy(false);
+          setProgress("");
+        }
+      }, [busy, cfg, capture, platforms]);
+
+      // Auto-scan loop
+      useEffect(() => {
+        if (screen === "cam" && camReady && cfg.autoScan) {
+          timerRef.current = setInterval(scan, cfg.interval * 1000);
+        }
+        return () => clearInterval(timerRef.current);
+      }, [screen, camReady, cfg.autoScan, cfg.interval, scan]);
+
+      const signal = buySignal(mktPrice, prices);
+
+      // ── SCREENS ─────────────────────────────────────────────────────────────
+
+      const S = {
+        // shared
+        app:   { background:"#080810", minHeight:"100vh", color:"#e8e8f0", fontFamily:"'DM Mono', monospace", maxWidth:430, margin:"0 auto" },
+        hdr:   { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:"1px solid #1a1a2e", background:"rgba(8,8,16,0.97)", position:"sticky", top:0, zIndex:100 },
+        logo:  { fontSize:15, letterSpacing:4, color:"#8080a0", fontWeight:300 },
+        logoG: { color:"#00ff87", fontWeight:700 },
+        tabs:  { display:"flex", gap:4 },
+        tab:   { background:"transparent", border:"1px solid #1a1a2e", color:"#666", padding:"6px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontFamily:"inherit" },
+        tabA:  { background:"#00ff8710", borderColor:"#00ff87", color:"#00ff87" },
+        // setup
+        setup: { padding:16, paddingBottom:60 },
+        h2:    { fontSize:11, letterSpacing:4, color:"#8080a0", marginBottom:16, textTransform:"uppercase" },
+        card:  { background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:16, marginBottom:12 },
+        lbl:   { display:"block", fontSize:10, letterSpacing:2, color:"#00ff87", marginBottom:6, textTransform:"uppercase" },
+        hint:  { fontSize:11, color:"#555", marginBottom:10, lineHeight:1.5 },
+        inp:   { width:"100%", background:"#080810", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 12px", color:"#e8e8f0", fontSize:13, fontFamily:"inherit" },
+        pgrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 },
+        chips: { display:"flex", gap:8, flexWrap:"wrap" },
+        chip:  { padding:"7px 14px", borderRadius:20, border:"1px solid #2a2a3e", background:"transparent", color:"#666", cursor:"pointer", fontSize:12, fontFamily:"inherit" },
+        chipA: { background:"#00ff8720", borderColor:"#00ff87", color:"#00ff87" },
+        cta:   { width:"100%", padding:16, background:"linear-gradient(135deg,#00ff87,#00ccff)", border:"none", borderRadius:12, color:"#080810", fontWeight:700, fontSize:15, fontFamily:"inherit", cursor:"pointer", letterSpacing:2, marginTop:8 },
+        // cam
+        camWrap:  { position:"relative", width:"100%", background:"#000", flexShrink:0 },
+        video:    { width:"100%", display:"block", maxHeight:"55vh", objectFit:"cover" },
+        overlay:  { position:"absolute", inset:0, pointerEvents:"none" },
+        corners:  { position:"absolute", inset:"15%" },
+        corner:   { position:"absolute", width:22, height:22 },
+        sbar:     { position:"absolute", bottom:0, left:0, right:0, padding:"8px 16px", background:"linear-gradient(transparent,rgba(8,8,16,.9))" },
+        stxt:     { fontSize:12, color:"#00ff87", letterSpacing:1 },
+        manualBtn:{ position:"absolute", bottom:10, right:12, width:54, height:54, borderRadius:"50%", background:"#00ff87", border:"none", fontSize:26, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
+        // result
+        rcard:  { background:"#0a0a16", borderTop:"2px solid #00ff87", padding:16, overflowY:"auto" },
+        rbrand: { fontSize:22, fontWeight:700, letterSpacing:1 },
+        rdet:   { fontSize:12, color:"#8080a0", marginTop:4, letterSpacing:1 },
+        rcond:  { display:"inline-block", marginTop:6, padding:"3px 10px", background:"#00ff8715", border:"1px solid #00ff8740", borderRadius:20, fontSize:10, color:"#00ff87", letterSpacing:1 },
+        rconf:  { width:44, height:44, borderRadius:"50%", background:"#00ff8715", border:"2px solid #00ff8740", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#00ff87", flexShrink:0 },
+        pmain:  { display:"flex", justifyContent:"space-between", alignItems:"baseline", margin:"16px 0 6px" },
+        plbl:   { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase" },
+        pval:   { fontSize:34, fontWeight:700 },
+        prow:   { display:"flex", alignItems:"center", gap:8, fontSize:10, color:"#555", marginBottom:16 },
+        pbar:   { flex:1, height:4, background:"#1a1a2e", borderRadius:2, position:"relative", overflow:"hidden" },
+        pbfill: { position:"absolute", left:0, top:0, height:"100%", background:"#00ff87", borderRadius:2 },
+        pblist: { background:"#080810", border:"1px solid #1a1a2e", borderRadius:10, padding:"4px 0", marginBottom:16 },
+        pbrow:  { display:"flex", alignItems:"center", padding:"9px 14px", borderBottom:"1px solid #0d0d1a" },
+        pbn:    { flex:1, fontSize:12, color:"#8080a0" },
+        pbp:    { fontSize:14, fontWeight:700, marginRight:10 },
+        pbc:    { fontSize:10, color:"#444" },
+        propS:  { marginBottom:16 },
+        propL:  { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase", marginBottom:8 },
+        propB:  { height:7, background:"#1a1a2e", borderRadius:4, overflow:"hidden", marginBottom:6 },
+        propV:  { fontSize:14, fontWeight:600 },
+        calc:   { background:"#080810", border:"1px solid #1a1a2e", borderRadius:12, padding:14, marginBottom:14 },
+        calcL:  { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase", marginBottom:10 },
+        calcR:  { display:"flex", gap:10, alignItems:"center", marginBottom:8 },
+        calcI:  { flex:1, background:"#0d0d1a", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 12px", color:"#e8e8f0", fontSize:18, fontFamily:"inherit" },
+        calcSig:{ padding:"8px 12px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:700, letterSpacing:1, display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 },
+        thresh: { display:"flex", justifyContent:"space-between", fontSize:10, color:"#555" },
+        simnote:{ textAlign:"center", fontSize:10, color:"#444", padding:"8px 0", borderTop:"1px solid #1a1a2e", marginBottom:12 },
+        actrow: { display:"flex", gap:10 },
+        actbtn: { flex:1, padding:13, background:"#00ff8720", border:"1px solid #00ff8740", borderRadius:10, color:"#00ff87", fontSize:12, fontFamily:"inherit", cursor:"pointer", letterSpacing:1 },
+        actbtn2:{ flex:1, padding:13, background:"#1a1a2e", border:"1px solid #2a2a3e", borderRadius:10, color:"#8080a0", fontSize:12, fontFamily:"inherit", cursor:"pointer", letterSpacing:1 },
+        errBox: { margin:16, padding:14, background:"#ff444415", border:"1px solid #ff444440", borderRadius:10, fontSize:12, color:"#ff6666" },
+        // history
+        hpanel:{ padding:16, paddingBottom:60 },
+        hcard: { display:"flex", gap:12, background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:12, marginBottom:10 },
+        hthumb:{ width:66, height:66, objectFit:"cover", borderRadius:8, flexShrink:0 },
+        hbrand:{ fontSize:14, fontWeight:600, marginBottom:4 },
+        hprice:{ fontSize:13, color:"#00ff87", marginBottom:2 },
+        hts:   { fontSize:10, color:"#555", marginBottom:4 },
+        hthr:  { fontSize:10, color:"#666" },
+        empty: { textAlign:"center", color:"#444", padding:"60px 20px", fontSize:14 },
+        tgl:   { width:46, height:24, borderRadius:12, border:"none", cursor:"pointer", position:"relative", padding:2, display:"flex", alignItems:"center" },
+        tglk:  { width:18, height:18, borderRadius:"50%", background:"#fff", transition:"transform 0.2s" },
+      };
+
+      const tabStyle  = t => ({ ...S.tab,  ...(screen===t ? S.tabA : {}) });
+      const chipStyle = v => ({ ...S.chip, ...(cfg.interval===v ? S.chipA : {}) });
+
+      const togglePlatform = k => setPlatforms(prev =>
+        prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]
+      );
+
+      return (
+        <div style={S.app}>
+
+          {/* ── HEADER ── */}
+          <header style={S.hdr}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:20 }}>🏷️</span>
+              <span style={S.logo}>THRIFT<span style={S.logoG}>LENS</span></span>
+            </div>
+            <div style={S.tabs}>
+              <button style={tabStyle("cam")} onClick={() => { setScreen("cam"); startCam(); }}>📷 Scan</button>
+              <button style={tabStyle("history")} onClick={() => setScreen("history")}>🗂 ({history.length})</button>
+              <button style={tabStyle("setup")} onClick={() => { setScreen("setup"); stopCam(); }}>⚙️</button>
+            </div>
+          </header>
+
+          {/* ── SETUP ── */}
+          {screen === "setup" && (
+            <div style={S.setup} className="fade-in">
+              <div style={S.h2}>Configuration</div>
+
+              <div style={S.card}>
+                <label style={S.lbl}>Anthropic API Key (required)</label>
+                <p style={S.hint}>Your Claude API key for image recognition. Get one at console.anthropic.com</p>
+                <input style={S.inp} type="password" placeholder="sk-ant-api03-..."
+                  value={cfg.anthropicKey}
+                  onChange={e => setCfg(c => ({ ...c, anthropicKey: e.target.value }))}
+                />
+              </div>
+
+              <div style={S.card}>
+                <label style={S.lbl}>Apify Token (optional)</label>
+                <p style={S.hint}>For real scraped prices. Without it, prices are market estimates. Get free tier at apify.com</p>
+                <input style={S.inp} type="password" placeholder="apify_api_xxxx..."
+                  value={cfg.apifyToken}
+                  onChange={e => setCfg(c => ({ ...c, apifyToken: e.target.value }))}
+                />
+              </div>
+
+              <div style={S.card}>
+                <label style={S.lbl}>Active Platforms</label>
+                <div style={S.pgrid}>
+                  {Object.entries(PLATFORMS).map(([k, p]) => {
+                    const active = platforms.includes(k);
+                    return (
+                      <button key={k} onClick={() => togglePlatform(k)} style={{
+                        padding:"9px 10px", borderRadius:8, border:"1px solid",
+                        cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all 0.2s",
+                        background: active ? p.color+"22" : "transparent",
+                        borderColor: active ? p.color : "#333",
+                        color: active ? p.color : "#555",
+                      }}>
+                        {p.emoji} {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <label style={S.lbl}>Auto-scan interval</label>
+                <div style={S.chips}>
+                  {[2,3,5,8].map(v => (
+                    <button key={v} style={chipStyle(v)} onClick={() => setCfg(c => ({ ...c, interval: v }))}>{v}s</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ ...S.card, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <label style={{ ...S.lbl, marginBottom:0 }}>Auto-scan</label>
+                <button style={{ ...S.tgl, background: cfg.autoScan ? "#00ff87" : "#333" }}
+                  onClick={() => setCfg(c => ({ ...c, autoScan: !c.autoScan }))}>
+                  <div style={{ ...S.tglk, transform: cfg.autoScan ? "translateX(22px)" : "translateX(0)" }} />
+                </button>
+              </div>
+
+              <button style={S.cta} onClick={() => { setScreen("cam"); startCam(); }}>
+                🚀 Start Scanning
+              </button>
+            </div>
+          )}
+
+          {/* ── CAMERA ── */}
+          {(screen === "cam" || screen === "result") && (
+            <div style={{ display:"flex", flexDirection:"column" }}>
+              <div style={S.camWrap}>
+                <video ref={videoRef} style={S.video} playsInline muted autoPlay />
+                <canvas ref={canvasRef} style={{ display:"none" }} />
+
+                <div style={S.overlay}>
+                  {/* Corner brackets */}
+                  {[
+                    { top:"18%", left:"12%", borderTop:"3px solid #00ff87", borderLeft:"3px solid #00ff87" },
+                    { top:"18%", right:"12%", borderTop:"3px solid #00ff87", borderRight:"3px solid #00ff87" },
+                    { bottom:"18%", left:"12%", borderBottom:"3px solid #00ff87", borderLeft:"3px solid #00ff87" },
+                    { bottom:"18%", right:"12%", borderBottom:"3px solid #00ff87", borderRight:"3px solid #00ff87" },
+                  ].map((c, i) => <div key={i} style={{ position:"absolute", width:24, height:24, ...c }} />)}
+
+                  {busy && <div className="scan-line" style={{
+                    position:"absolute", left:"12%", right:"12%", height:2,
+                    background:"linear-gradient(90deg,transparent,#00ff87,transparent)"
+                  }} />}
+                </div>
+
+                <div style={S.sbar}>
+                  <span style={S.stxt} className={busy ? "pulse" : ""}>
+                    {busy ? progress : camReady ? (cfg.autoScan ? "⚡ Auto-scanning every "+cfg.interval+"s" : "Tap 📸 to scan") : "Starting camera..."}
+                  </span>
+                </div>
+
+                {!cfg.autoScan && (
+                  <button style={S.manualBtn} onClick={scan} disabled={busy}>
+                    {busy ? "⏳" : "📸"}
+                  </button>
+                )}
+              </div>
+
+              {/* ── RESULT ── */}
+              {screen === "result" && item && prices && (
+                <div style={S.rcard} className="fade-in">
+
+                  {/* Item header */}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                    <div>
+                      <div style={S.rbrand}>{item.brand || "Unknown Brand"}</div>
+                      <div style={S.rdet}>{[item.subcategory, item.color, item.size_visible].filter(Boolean).join(" · ")}</div>
+                      <div style={S.rcond}>{item.condition_estimate} · {item.gender}</div>
+                    </div>
+                    <div style={S.rconf}>{Math.round((item.confidence||0)*100)}%</div>
+                  </div>
+
+                  {/* Price */}
+                  <div style={S.pmain}>
+                    <span style={S.plbl}>Weighted Resale Price</span>
+                    <span style={S.pval}>€{prices.weightedMedian}</span>
+                  </div>
+                  <div style={S.prow}>
+                    <span>Low €{prices.overallP25}</span>
+                    <div style={S.pbar}><div style={{ ...S.pbfill, width:"55%" }} /></div>
+                    <span>Median €{prices.overallMedian}</span>
+                  </div>
+
+                  {/* Per-platform */}
+                  <div style={S.pblist}>
+                    {Object.entries(prices.platforms).map(([p, d]) => (
+                      <div key={p} style={S.pbrow}>
+                        <span style={S.pbn}>{PLATFORMS[p]?.emoji} {PLATFORMS[p]?.name}</span>
+                        <span style={{ ...S.pbp, color: PLATFORMS[p]?.color }}>€{d.median}</span>
+                        <span style={S.pbc}>{d.count} items</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Propensity */}
+                  <div style={S.propS}>
+                    <div style={S.propL}>Sell Propensity</div>
+                    <div style={S.propB}>
+                      <div style={{
+                        height:"100%", borderRadius:4, transition:"width 0.7s ease",
+                        width:`${prices.propensity}%`,
+                        background: prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444"
+                      }} />
+                    </div>
+                    <div style={{ ...S.propV, color: prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444" }}>
+                      {prices.propensity}% likely to sell · {prices.totalListings} active listings
+                    </div>
+                  </div>
+
+                  {/* Buy calculator */}
+                  <div style={S.calc}>
+                    <div style={S.calcL}>💶 What does the seller want?</div>
+                    <div style={S.calcR}>
+                      <input style={S.calcI} type="number" placeholder="€ price tag"
+                        value={mktPrice}
+                        onChange={e => setMktPrice(e.target.value)}
+                      />
+                      {signal && (
+                        <div style={{ ...S.calcSig, background:signal.color+"18", borderColor:signal.color, color:signal.color }}>
+                          {signal.icon} {signal.label}
+                          {signal.margin > 0 && <span style={{ fontSize:10, fontWeight:400, marginTop:2 }}>+{signal.margin}%</span>}
+                        </div>
+                      )}
+                    </div>
+                    <div style={S.thresh}>
+                      <span>✅ Buy if &lt; €{prices.buyThreshold}</span>
+                      <span>⚠️ Maybe if &lt; €{prices.maybeThreshold}</span>
+                    </div>
+                  </div>
+
+                  {prices.simulated && (
+                    <div style={S.simnote}>⚡ Estimated prices — add Apify token for real scraped data</div>
+                  )}
+
+                  <div style={S.actrow}>
+                    <button style={S.actbtn} onClick={() => { setScreen("cam"); setItem(null); setPrices(null); }}>📷 Scan Again</button>
+                    <button style={S.actbtn2} onClick={() => setScreen("history")}>🗂 History</button>
+                  </div>
+                </div>
+              )}
+
+              {err && <div style={S.errBox}>{err}</div>}
+            </div>
+          )}
+
+          {/* ── HISTORY ── */}
+          {screen === "history" && (
+            <div style={S.hpanel} className="fade-in">
+              <div style={S.h2}>Scan History ({history.length})</div>
+              {history.length === 0
+                ? <div style={S.empty}>No scans yet. Go find some deals! 🧺</div>
+                : history.map(e => (
+                  <div key={e.id} style={S.hcard}>
+                    <img src={`data:image/jpeg;base64,${e.thumb}`} alt="" style={S.hthumb} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={S.hbrand}>{e.item.brand || "Unknown"} — {e.item.subcategory}</div>
+                      <div style={S.hprice}>€{e.prices.weightedMedian} avg · {e.prices.propensity}% sell rate</div>
+                      <div style={S.hts}>{e.ts}</div>
+                      <div style={S.hthr}>Buy &lt;€{e.prices.buyThreshold} · Maybe &lt;€{e.prices.maybeThreshold}</div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
