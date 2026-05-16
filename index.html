@@ -73,7 +73,7 @@
     };
 
     const APIFY_ACTORS = {
-      vinted:    "piotrv1001~vinted-listings-scraper",
+      vinted:    "kazkn~vinted-smart-scraper",
       depop:     "epctex~depop-scraper",
       wallapop:  "louisdeconinck~wallapop-scraper",
       vestiaire: "ecomscrape~vestiaire-collective-product-search-scraper",
@@ -286,7 +286,17 @@ Return ONLY JSON, no markdown.`;
       const timerRef  = useRef(null);
 
       const [screen, setScreen]       = useState("setup");   // setup | cam | result | history
-      const [cfg, setCfg]             = useState({ provider:"openai", apiKey:"", apifyToken:"", interval:3, autoScan:true });
+      const [cfg, setCfg] = useState(() => {
+        try {
+          const saved = JSON.parse(localStorage.getItem("thriftlens_cfg") || "{}");
+          return { provider:"openai", apiKey:"", apifyToken:"", interval:3, autoScan:true, ...saved };
+        } catch { return { provider:"openai", apiKey:"", apifyToken:"", interval:3, autoScan:true }; }
+      });
+
+      // Persist cfg to localStorage whenever it changes (except sensitive keys are stored too — user accepts this)
+      useEffect(() => {
+        try { localStorage.setItem("thriftlens_cfg", JSON.stringify(cfg)); } catch {}
+      }, [cfg]);
       const [platforms, setPlatforms] = useState(Object.keys(PLATFORMS));
       const [camReady, setCamReady]   = useState(false);
       const [busy, setBusy]           = useState(false);
@@ -294,6 +304,7 @@ Return ONLY JSON, no markdown.`;
       const [item, setItem]           = useState(null);
       const [prices, setPrices]       = useState(null);
       const [history, setHistory]     = useState([]);
+      const [clarify, setClarify]     = useState(null);   // null | {type, options, pendingItem, pendingB64}
       const [mktPrice, setMktPrice]   = useState("");
       const [err, setErr]             = useState("");
       const lastScan = useRef(0);
@@ -349,34 +360,23 @@ Return ONLY JSON, no markdown.`;
             return;
           }
 
-          setItem(identified);
-          setProgress("📡 Fetching prices from " + platforms.length + " platforms...");
-
-          // Parallel fetches
-          const tasks = {};
-          for (const p of platforms) {
-            if (p === "stockx" && !identified.is_streetwear_sneaker) continue;
-            if (p === "vestiaire" && identified.category === "electronics") continue;
-            if (p === "ebay") tasks[p] = Promise.resolve(simulatePrices(p, identified.search_query));
-            else tasks[p] = fetchApify(p, identified.search_query, cfg.apifyToken);
+          // Low confidence or unknown brand → ask clarifying questions first
+          if (!identified.error && (identified.confidence < 0.55 || !identified.brand)) {
+            const needsBrand    = !identified.brand;
+            const needsCategory = !identified.category || identified.category === "other";
+            if (needsBrand || needsCategory) {
+              setBusy(false);
+              setClarify({
+                pendingItem: identified,
+                pendingB64: b64,
+                step: needsBrand ? "brand" : "condition",
+              });
+              return;
+            }
           }
 
-          const raw = {};
-          await Promise.all(Object.entries(tasks).map(async ([p, t]) => {
-            try { raw[p] = await t; } catch { raw[p] = simulatePrices(p, identified.search_query); }
-          }));
-
-          setProgress("🧮 Calculating...");
-          const agg = aggregate(raw, identified);
-          if (!agg) throw new Error("Could not aggregate prices");
-
-          setPrices(agg);
-          setMktPrice("");
-          setScreen("result");
-          setHistory(h => [{
-            id: Date.now(), ts: new Date().toLocaleTimeString(),
-            item: identified, prices: agg, thumb: b64
-          }, ...h.slice(0, 29)]);
+          // Parallel fetches
+          await runPriceFetch(identified, b64);
         } catch(e) {
           setErr("Error: " + e.message);
         } finally {
@@ -384,6 +384,54 @@ Return ONLY JSON, no markdown.`;
           setProgress("");
         }
       }, [busy, cfg, capture, platforms]);
+
+
+      // ── Price fetch helper (reused by scan + clarify confirm) ───────────────
+      const runPriceFetch = useCallback(async (identified, b64) => {
+        setBusy(true);
+        setProgress("📡 Fetching prices from " + platforms.length + " platforms...");
+        try {
+          const tasks = {};
+          for (const p of platforms) {
+            if (p === "stockx" && !identified.is_streetwear_sneaker) continue;
+            if (p === "vestiaire" && identified.category === "electronics") continue;
+            if (p === "ebay") tasks[p] = Promise.resolve(simulatePrices(p, identified.search_query));
+            else tasks[p] = fetchApify(p, identified.search_query, cfg.apifyToken);
+          }
+          const raw = {};
+          await Promise.all(Object.entries(tasks).map(async ([p, t]) => {
+            try { raw[p] = await t; } catch { raw[p] = simulatePrices(p, identified.search_query); }
+          }));
+          setProgress("🧮 Calculating...");
+          const agg = aggregate(raw, identified);
+          if (!agg) throw new Error("Could not aggregate prices");
+          setItem(identified);
+          setPrices(agg);
+          setMktPrice("");
+          setScreen("result");
+          setHistory(h => [{
+            id: Date.now(), ts: new Date().toLocaleTimeString(),
+            item: identified, prices: agg, thumb: b64
+          }, ...h.slice(0, 29)]);
+        } finally {
+          setBusy(false);
+          setProgress("");
+        }
+      }, [platforms, cfg.apifyToken]);
+
+      // ── Clarify confirm handler ──────────────────────────────────────────────
+      const confirmClarify = useCallback(async (answers) => {
+        if (!clarify) return;
+        const updated = {
+          ...clarify.pendingItem,
+          ...answers,
+          search_query: [answers.brand, clarify.pendingItem.subcategory, clarify.pendingItem.color]
+            .filter(Boolean).join(" ").trim() || clarify.pendingItem.search_query,
+        };
+        setClarify(null);
+        setItem(updated);
+        await runPriceFetch(updated, clarify.pendingB64);
+      }, [clarify, runPriceFetch]);
 
       // Auto-scan loop
       useEffect(() => {
@@ -522,12 +570,14 @@ Return ONLY JSON, no markdown.`;
                   {cfg.provider === "openai"
                     ? "Get yours at platform.openai.com → API keys. ~$0.01 per scan with GPT-4o."
                     : "Get yours at console.anthropic.com. ~$0.003 per scan with Claude Sonnet."}
+                  {" "}<span style={{ color:"#00ff87" }}>Saved automatically in your browser.</span>
                 </p>
                 <input style={S.inp} type="password"
                   placeholder={cfg.provider === "openai" ? "sk-proj-..." : "sk-ant-api03-..."}
                   value={cfg.apiKey}
                   onChange={e => setCfg(c => ({ ...c, apiKey: e.target.value }))}
                 />
+                {cfg.apiKey && <div style={{ fontSize:10, color:"#00ff87", marginTop:6 }}>✓ Key saved in browser</div>}
               </div>
 
               <div style={S.card}>
@@ -701,6 +751,90 @@ Return ONLY JSON, no markdown.`;
               )}
 
               {err && <div style={S.errBox}>{err}</div>}
+            </div>
+          )}
+
+
+          {/* ── CLARIFY PANEL ── */}
+          {clarify && (
+            <div style={{ position:"fixed", inset:0, background:"rgba(8,8,16,0.95)", zIndex:200, display:"flex", flexDirection:"column", justifyContent:"flex-end" }} className="fade-in">
+              <div style={{ background:"#0d0d1a", borderTop:"2px solid #00ff87", borderRadius:"20px 20px 0 0", padding:24, paddingBottom:40 }}>
+                <div style={{ fontSize:10, letterSpacing:3, color:"#8080a0", textTransform:"uppercase", marginBottom:6 }}>
+                  Help me identify this
+                </div>
+
+                {clarify.step === "brand" && (<>
+                  <div style={{ fontSize:18, fontWeight:600, color:"#e8e8f0", marginBottom:4 }}>
+                    Which brand is it?
+                  </div>
+                  <div style={{ fontSize:12, color:"#555", marginBottom:20 }}>
+                    Check the label/tag · {clarify.pendingItem.subcategory} · {clarify.pendingItem.color}
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+                    {["Nike","Adidas","Zara","H&M","Levi's","Ralph Lauren","Mango","Pull&Bear","Stradivarius","Bershka","Tommy Hilfiger","Unknown"].map(b => (
+                      <button key={b} onClick={() => {
+                        const updated = { ...clarify, pendingItem: { ...clarify.pendingItem, brand: b === "Unknown" ? null : b }, step: "condition" };
+                        if (b === "Unknown") {
+                          setClarify(null);
+                          confirmClarify({ brand: null, condition_estimate: clarify.pendingItem.condition_estimate || "good" });
+                        } else {
+                          setClarify(updated);
+                        }
+                      }} style={{
+                        padding:"12px 8px", borderRadius:10, border:"1px solid #2a2a3e",
+                        background:"transparent", color: b === "Unknown" ? "#555" : "#e8e8f0",
+                        fontSize:13, fontFamily:"inherit", cursor:"pointer", textAlign:"center",
+                      }}>{b}</button>
+                    ))}
+                  </div>
+                  <input
+                    style={{ width:"100%", background:"#080810", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px", color:"#e8e8f0", fontSize:14, fontFamily:"inherit", marginBottom:12 }}
+                    placeholder="Type brand name..."
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && e.target.value.trim()) {
+                        const b = e.target.value.trim();
+                        setClarify(c => ({ ...c, pendingItem: { ...c.pendingItem, brand: b }, step: "condition" }));
+                      }
+                    }}
+                  />
+                </>)}
+
+                {clarify.step === "condition" && (<>
+                  <div style={{ fontSize:18, fontWeight:600, color:"#e8e8f0", marginBottom:4 }}>
+                    What's the condition?
+                  </div>
+                  <div style={{ fontSize:12, color:"#555", marginBottom:20 }}>
+                    {clarify.pendingItem.brand || "Unknown brand"} · {clarify.pendingItem.subcategory}
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+                    {[
+                      { v:"new",       l:"New",      e:"✨" },
+                      { v:"excellent", l:"Excellent", e:"⭐" },
+                      { v:"good",      l:"Good",      e:"👍" },
+                      { v:"fair",      l:"Fair",      e:"😐" },
+                      { v:"poor",      l:"Poor",      e:"🤕" },
+                    ].map(c => (
+                      <button key={c.v} onClick={() => confirmClarify({
+                        brand: clarify.pendingItem.brand,
+                        condition_estimate: c.v,
+                      })} style={{
+                        padding:"16px 8px", borderRadius:10, border:"1px solid #2a2a3e",
+                        background:"transparent", color:"#e8e8f0",
+                        fontSize:12, fontFamily:"inherit", cursor:"pointer",
+                        display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+                      }}>
+                        <span style={{ fontSize:22 }}>{c.e}</span>
+                        {c.l}
+                      </button>
+                    ))}
+                  </div>
+                </>)}
+
+                <button onClick={() => setClarify(null)} style={{
+                  width:"100%", marginTop:18, padding:12, background:"transparent",
+                  border:"1px solid #2a2a3e", borderRadius:10, color:"#555", fontSize:12, fontFamily:"inherit", cursor:"pointer"
+                }}>← Cancel, scan again</button>
+              </div>
             </div>
           )}
 
