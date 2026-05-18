@@ -1,1134 +1,931 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#080810" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="ThriftLens" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#080810"/>
   <title>ThriftLens</title>
-
-  <!-- PWA manifest inline -->
-  <link rel="manifest" href="manifest.json" />
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
-
-  <!-- React + Babel (no build needed) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-
+  <link rel="manifest" href="manifest.json"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; background: #080810; }
-    #root { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#080810;overflow:hidden}
+    body{font-family:'DM Mono',monospace;color:#e8e8f0}
+    #app{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;max-width:430px;margin:0 auto}
+    input,button{-webkit-appearance:none;outline:none;font-family:inherit}
+    input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+    ::-webkit-scrollbar{display:none}
 
-    @keyframes scanline {
-      0%   { top: 20%; opacity: 1; }
-      50%  { top: 80%; opacity: 0.6; }
-      100% { top: 20%; opacity: 1; }
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    /* Header */
+    #header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
+      border-bottom:1px solid #1a1a2e;background:rgba(8,8,16,.97);position:sticky;top:0;z-index:100}
+    .logo{font-size:15px;letter-spacing:4px;color:#8080a0;font-weight:300}
+    .logo b{color:#00ff87;font-weight:700;letter-spacing:2px}
+    .tabs{display:flex;gap:4px}
+    .tab{background:transparent;border:1px solid #1a1a2e;color:#666;padding:6px 10px;
+      border-radius:6px;cursor:pointer;font-size:11px}
+    .tab.active{background:#00ff8710;border-color:#00ff87;color:#00ff87}
 
-    .scan-line   { animation: scanline 1.8s ease-in-out infinite; }
-    .pulse       { animation: pulse 1.2s ease-in-out infinite; }
-    .fade-in     { animation: fadeIn 0.4s ease forwards; }
+    /* Screens */
+    .screen{display:none;padding:16px;padding-bottom:60px;animation:fadeIn .3s ease}
+    .screen.visible{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes scanline{0%{top:20%}50%{top:75%}100%{top:20%}}
 
-    input, button { -webkit-appearance: none; outline: none; }
-    input[type=number]::-webkit-inner-spin-button,
-    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    /* Cards */
+    .card{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:12px;padding:16px;margin-bottom:12px}
+    .lbl{display:block;font-size:10px;letter-spacing:2px;color:#00ff87;margin-bottom:6px;text-transform:uppercase}
+    .hint{font-size:11px;color:#555;margin-bottom:10px;line-height:1.6}
+    .section-title{font-size:11px;letter-spacing:4px;color:#8080a0;margin-bottom:16px;text-transform:uppercase}
 
-    ::-webkit-scrollbar { display: none; }
+    /* Camera screen */
+    #cam-screen{display:none;flex-direction:column}
+    #cam-screen.visible{display:flex}
+    #cam-wrap{position:relative;width:100%;background:#000;flex-shrink:0}
+    #video{width:100%;display:block;max-height:60vh;object-fit:cover}
+    #cam-overlay{position:absolute;inset:0;pointer-events:none}
+    .corner{position:absolute;width:24px;height:24px;border-color:#00ff87}
+    #scan-line{position:absolute;left:12%;right:12%;height:2px;
+      background:linear-gradient(90deg,transparent,#00ff87,transparent);
+      display:none;animation:scanline 1.8s ease-in-out infinite}
+    #cam-status{position:absolute;bottom:0;left:0;right:0;padding:8px 16px;
+      background:linear-gradient(transparent,rgba(8,8,16,.9));font-size:12px;color:#00ff87;letter-spacing:1px}
+    #manual-btn{position:absolute;bottom:10px;right:12px;width:54px;height:54px;border-radius:50%;
+      background:#00ff87;border:none;font-size:26px;cursor:pointer;display:none;
+      align-items:center;justify-content:center}
+
+    /* Detail screen */
+    #detail-screen{display:none;padding:16px;padding-bottom:120px;animation:fadeIn .3s ease}
+    #detail-screen.visible{display:block}
+    #detail-thumb{width:88px;height:88px;object-fit:cover;border-radius:12px;
+      border:2px solid #1a1a2e;flex-shrink:0}
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;letter-spacing:1px;margin:2px}
+    .badge.green{background:#00ff8715;border:1px solid #00ff8740;color:#00ff87}
+    .badge.gray{background:#ffffff08;border:1px solid #2a2a3e;color:#666}
+    .big-price{font-size:48px;font-weight:700;color:#e8e8f0;line-height:1}
+    .prop-bar-bg{height:8px;background:#080810;border-radius:4px;overflow:hidden;margin:8px 0}
+    .prop-bar-fill{height:100%;border-radius:4px;transition:width .8s ease}
+    .platform-row{display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid #080810}
+    .buy-btn{padding:20px 0;border-radius:16px;border:2px solid;font-size:16px;font-weight:700;
+      cursor:pointer;letter-spacing:2px;flex:1}
+    .buy-btn.yes{border-color:#00ff87;background:#00ff8720;color:#00ff87}
+    .buy-btn.no{border-color:#ff4444;background:#ff444420;color:#ff4444}
+    .skip-btn{width:100%;margin-top:12px;padding:14px;border-radius:12px;border:1px solid #2a2a3e;
+      background:transparent;color:#555;font-size:12px;cursor:pointer}
+
+    /* History */
+    .stat-box{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:10px 8px;text-align:center}
+    .stat-val{font-size:18px;font-weight:700;line-height:1.2}
+    .stat-lbl{font-size:9px;color:#555;margin-top:3px;letter-spacing:1px;text-transform:uppercase}
+    .hist-card{display:flex;gap:12px;background:#0d0d1a;border:1px solid #1a1a2e;
+      border-radius:12px;padding:12px;margin-bottom:10px}
+    .hist-thumb-wrap{position:relative;flex-shrink:0}
+    .hist-thumb{width:66px;height:66px;object-fit:cover;border-radius:8px}
+    .dec-dot{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+
+    /* Preferences */
+    .chip{padding:7px 14px;border-radius:20px;border:1px solid #2a2a3e;background:transparent;
+      color:#666;cursor:pointer;font-size:12px}
+    .chip.active{background:#00ff8720;border-color:#00ff87;color:#00ff87}
+    .platform-btn{padding:9px 10px;border-radius:8px;border:1px solid #333;background:transparent;
+      color:#555;cursor:pointer;font-size:12px;transition:all .2s}
+    .toggle-wrap{display:flex;justify-content:space-between;align-items:center}
+    .toggle{width:46px;height:24px;border-radius:12px;border:none;cursor:pointer;
+      position:relative;padding:2px;display:flex;align-items:center;transition:background .3s}
+    .toggle-knob{width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
+    .cta-btn{width:100%;padding:16px;background:linear-gradient(135deg,#00ff87,#00ccff);
+      border:none;border-radius:12px;color:#080810;font-weight:700;font-size:15px;
+      cursor:pointer;letter-spacing:2px;margin-top:8px}
+    .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .chips-row{display:flex;gap:8px;flex-wrap:wrap}
+
+    /* Misc */
+    .err-box{margin:16px;padding:14px;background:#ff444415;border:1px solid #ff444440;
+      border-radius:10px;font-size:12px;color:#ff6666}
+    .calc-box{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:12px;padding:16px;margin-bottom:16px}
+    .price-input{flex:1;background:#080810;border:1px solid #2a2a3e;border-radius:8px;
+      padding:12px;color:#e8e8f0;font-size:20px;width:100%}
+    .signal-box{padding:10px 14px;border-radius:10px;border:1px solid;font-size:13px;
+      font-weight:700;text-align:center;flex-shrink:0;min-width:80px}
+    .enrich-note{text-align:center;font-size:10px;padding:8px 0;border-top:1px solid #1a1a2e;margin-bottom:12px}
+    .empty{text-align:center;color:#444;padding:60px 20px;font-size:14px}
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:20px}
   </style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="app">
 
-  <script type="text/babel">
-    const { useState, useRef, useEffect, useCallback } = React;
+  <!-- HEADER -->
+  <div id="header">
+    <div class="logo">🏷️ THRIFT<b>LENS</b></div>
+    <div class="tabs">
+      <button class="tab active" id="tab-cam"    onclick="showScreen('cam')">📷</button>
+      <button class="tab"        id="tab-history" onclick="showScreen('history')">🗂 <span id="scan-count"></span></button>
+      <button class="tab"        id="tab-prefs"   onclick="showScreen('prefs')">⚙️</button>
+    </div>
+  </div>
 
-    // ─── CONFIG ──────────────────────────────────────────────────────────────
-    const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
-    const OPENAI_MODEL    = "gpt-4o";
+  <!-- CAMERA SCREEN -->
+  <div id="cam-screen" class="screen visible">
+    <div id="cam-wrap">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="canvas" style="display:none"></canvas>
+      <div id="cam-overlay">
+        <div class="corner" style="position:absolute;top:18%;left:12%;border-top:3px solid;border-left:3px solid"></div>
+        <div class="corner" style="position:absolute;top:18%;right:12%;border-top:3px solid;border-right:3px solid"></div>
+        <div class="corner" style="position:absolute;bottom:18%;left:12%;border-bottom:3px solid;border-left:3px solid"></div>
+        <div class="corner" style="position:absolute;bottom:18%;right:12%;border-bottom:3px solid;border-right:3px solid"></div>
+        <div id="scan-line"></div>
+      </div>
+      <div id="cam-status">Starting camera...</div>
+      <button id="manual-btn" onclick="doScan()">📸</button>
+    </div>
+    <div id="cam-err"></div>
+  </div>
 
-    const PLATFORMS = {
-      ebay:      { name: "eBay EU",   color: "#e53238", emoji: "🛒" },
-      vinted:    { name: "Vinted",    color: "#09b1ba", emoji: "👗" },
-      depop:     { name: "Depop",     color: "#ff2300", emoji: "🔴" },
-      wallapop:  { name: "Wallapop",  color: "#13c1ac", emoji: "🟢" },
-      stockx:    { name: "StockX",    color: "#00ff87", emoji: "👟" },
-      leboncoin: { name: "LeBonCoin", color: "#f56b2a", emoji: "🇫🇷" },
-      subito:    { name: "Subito.it", color: "#cc0033", emoji: "🇮🇹" },
+  <!-- DETAIL SCREEN -->
+  <div id="detail-screen">
+    <div style="display:flex;gap:14px;margin-bottom:20px;align-items:flex-start">
+      <img id="detail-thumb" src="" alt=""/>
+      <div style="flex:1">
+        <div id="detail-brand" style="font-size:22px;font-weight:700;line-height:1.2"></div>
+        <div id="detail-sub"   style="font-size:12px;color:#8080a0;margin-top:4px"></div>
+        <div id="detail-badges" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Weighted Resale Price</div>
+      <div class="big-price" id="detail-price">—</div>
+      <div id="detail-range" style="font-size:12px;color:#555;margin-top:8px"></div>
+      <div id="detail-data-note" class="enrich-note" style="margin-top:8px;border-top:none"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:10px;letter-spacing:2px;color:#8080a0;text-transform:uppercase">Sell Propensity</span>
+        <span id="prop-pct" style="font-size:16px;font-weight:700"></span>
+      </div>
+      <div class="prop-bar-bg"><div id="prop-bar" class="prop-bar-fill" style="width:0%"></div></div>
+      <div id="prop-listings" style="font-size:11px;color:#555;margin-top:4px"></div>
+    </div>
+
+    <div id="platforms-list" class="card" style="padding:4px 0;margin-bottom:16px"></div>
+
+    <div class="calc-box">
+      <div style="font-size:10px;letter-spacing:2px;color:#8080a0;text-transform:uppercase;margin-bottom:12px">💶 Seller's asking price</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <input class="price-input" type="number" id="mkt-price" placeholder="€ e.g. 15" oninput="updateSignal()"/>
+        <div class="signal-box" id="signal-box" style="display:none"></div>
+      </div>
+      <div id="thresholds" style="display:flex;justify-content:space-between;font-size:10px;color:#555"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <button class="buy-btn yes" onclick="recordDecision('buy')">✅ BUY</button>
+      <button class="buy-btn no"  onclick="recordDecision('pass')">❌ PASS</button>
+    </div>
+    <button class="skip-btn" onclick="recordDecision(null)">📷 Skip &amp; scan next</button>
+  </div>
+
+  <!-- HISTORY SCREEN -->
+  <div id="history-screen" class="screen">
+    <div class="stats-grid" id="stats-grid" style="display:none"></div>
+    <div class="section-title">All Scans</div>
+    <div id="history-list"><div class="empty">No scans yet. Go find some deals! 🧺</div></div>
+  </div>
+
+  <!-- PREFERENCES SCREEN -->
+  <div id="prefs-screen" class="screen">
+    <div class="section-title">Preferences</div>
+
+    <div class="card">
+      <label class="lbl">Auto-scan interval</label>
+      <p class="hint">How often to capture a frame automatically.</p>
+      <div class="chips-row" id="interval-chips"></div>
+    </div>
+
+    <div class="card toggle-wrap">
+      <div>
+        <label class="lbl" style="margin-bottom:2px">Auto-scan</label>
+        <p class="hint" style="margin-bottom:0">Continuous or manual tap.</p>
+      </div>
+      <button class="toggle" id="autoscan-toggle" onclick="toggleAutoScan()">
+        <div class="toggle-knob" id="toggle-knob"></div>
+      </button>
+    </div>
+
+    <div class="card">
+      <label class="lbl">Active Platforms</label>
+      <div class="pgrid" id="platform-grid"></div>
+    </div>
+
+    <button class="cta-btn" onclick="showScreen('cam')">📷 Start Scanning</button>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIG — replace these with your real keys before uploading
+// ═══════════════════════════════════════════════════════════════════════════════
+const OPENAI_KEY  = "YOUR_OPENAI_KEY_HERE";
+const APIFY_TOKEN = "YOUR_APIFY_TOKEN_HERE";
+
+const PLATFORMS = {
+  ebay:      { name:"eBay EU",   color:"#e53238", emoji:"🛒" },
+  vinted:    { name:"Vinted",    color:"#09b1ba", emoji:"👗" },
+  depop:     { name:"Depop",     color:"#ff2300", emoji:"🔴" },
+  wallapop:  { name:"Wallapop",  color:"#13c1ac", emoji:"🟢" },
+  stockx:    { name:"StockX",    color:"#00ff87", emoji:"👟" },
+  leboncoin: { name:"LeBonCoin", color:"#f56b2a", emoji:"🇫🇷" },
+  subito:    { name:"Subito.it", color:"#cc0033", emoji:"🇮🇹" },
+};
+
+const APIFY_ACTORS = {
+  vinted:    "kazkn~vinted-smart-scraper",
+  depop:     "epctex~depop-scraper",
+  wallapop:  "louisdeconinck~wallapop-scraper",
+  leboncoin: "apify~leboncoin-scraper",
+  subito:    "epctex~subito-scraper",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+let prefs = { interval:3, autoScan:true, platforms:Object.keys(PLATFORMS) };
+try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem("tl_prefs")||"{}") }; } catch(e){}
+
+let currentItem   = null;
+let currentPrices = null;
+let currentScan   = null;
+let currentB64    = null;
+let scanning      = false;
+let lastScanTime  = 0;
+let scanTimer     = null;
+let stream        = null;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════════════════════════════════════════
+function openDB() {
+  return new Promise((res,rej) => {
+    const req = indexedDB.open("thriftlens",1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("scans")) {
+        const s = db.createObjectStore("scans",{keyPath:"id"});
+        s.createIndex("category","category",{unique:false});
+        s.createIndex("brand","brand",{unique:false});
+      }
     };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+async function dbSave(scan) {
+  const db = await openDB();
+  return new Promise((res,rej) => {
+    const tx = db.transaction("scans","readwrite");
+    tx.objectStore("scans").put(scan);
+    tx.oncomplete = res; tx.onerror = rej;
+  });
+}
+async function dbAll() {
+  const db = await openDB();
+  return new Promise((res,rej) => {
+    const req = db.transaction("scans","readonly").objectStore("scans").getAll();
+    req.onsuccess = e => res(e.target.result.reverse());
+    req.onerror = rej;
+  });
+}
 
-    const APIFY_ACTORS = {
-      vinted:    "kazkn~vinted-smart-scraper",
-      depop:     "epctex~depop-scraper",
-      wallapop:  "louisdeconinck~wallapop-scraper",
-      leboncoin: "apify~leboncoin-scraper",
-      subito:    "epctex~subito-scraper",
-    };
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCREEN NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════════
+function showScreen(name) {
+  // Hide all
+  document.getElementById("cam-screen").classList.remove("visible");
+  document.getElementById("detail-screen").classList.remove("visible");
+  document.getElementById("history-screen").classList.remove("visible");
+  document.getElementById("prefs-screen").classList.remove("visible");
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
 
-    // ─── VISION ──────────────────────────────────────────────────────────────
-    const VISION_PROMPT = `You are a secondhand resale expert who identifies items for pricing on Vinted, eBay, and Depop.
-Analyze the image and return ONLY valid JSON. Be SPECIFIC — wrong specificity means wrong prices.
+  if (name === "cam") {
+    document.getElementById("cam-screen").classList.add("visible");
+    document.getElementById("tab-cam").classList.add("active");
+    startCamera();
+  } else if (name === "detail") {
+    document.getElementById("detail-screen").classList.add("visible");
+    document.getElementById("tab-cam").classList.add("active");
+    stopCamera();
+  } else if (name === "history") {
+    document.getElementById("history-screen").classList.add("visible");
+    document.getElementById("tab-history").classList.add("active");
+    stopCamera();
+    renderHistory();
+  } else if (name === "prefs") {
+    document.getElementById("prefs-screen").classList.add("visible");
+    document.getElementById("tab-prefs").classList.add("active");
+    stopCamera();
+  }
+}
 
-Rules:
-- brand: exact brand name (e.g. "Olympus", "Levi's 501", "Nike Air Max 90") — never generic
-- search_query: the EXACT model/item name as you'd type on eBay (e.g. "Olympus XA compact film camera", "Levi's 501 jeans W32", "Nike Air Max 90 white") — include model number if visible
-- category: clothing|shoes|bag|accessory|camera|electronics|vinyl|book|toy|other
-- for cameras: always include brand + exact model in search_query
-- for clothing: include brand + garment type + key detail (color or fit)
-- condition_estimate: new|excellent|good|fair|poor — be honest from what you see
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════════════════════════════════════
+async function startCamera() {
+  clearInterval(scanTimer);
+  if (stream) return; // already running
+  setStatus("Starting camera...");
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:"environment"}, width:{ideal:1280} }
+    });
+    const video = document.getElementById("video");
+    video.srcObject = stream;
+    await video.play();
+    setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
+    document.getElementById("manual-btn").style.display = prefs.autoScan ? "none" : "flex";
+    if (prefs.autoScan) {
+      scanTimer = setInterval(doScan, prefs.interval * 1000);
+    }
+  } catch(e) {
+    setErr("Camera blocked. Open in Safari and allow camera access.\n\n" + e.message);
+  }
+}
 
+function stopCamera() {
+  clearInterval(scanTimer);
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+}
+
+function captureFrame() {
+  const video  = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  if (!video || video.readyState < 2) return null;
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+}
+
+function setStatus(msg) {
+  const el = document.getElementById("cam-status");
+  if (el) el.textContent = msg;
+}
+function setErr(msg) {
+  const el = document.getElementById("cam-err");
+  if (el) { el.className = "err-box"; el.textContent = msg; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION
+// ═══════════════════════════════════════════════════════════════════════════════
+const VISION_PROMPT = `You are a secondhand resale expert. Identify the item in the image for pricing.
+Return ONLY valid JSON, no markdown:
 {
-  "brand": "exact brand",
-  "model": "exact model name/number if visible",
-  "category": "category",
-  "subcategory": "specific type",
+  "brand": "exact brand or null",
+  "model": "exact model name/number or null",
+  "category": "clothing|shoes|bag|camera|watch|accessory|electronics|vinyl|antique|other",
+  "subcategory": "specific type e.g. jeans, sneakers, film camera",
   "color": "main color",
-  "material": "if visible",
-  "condition_estimate": "good",
+  "condition_estimate": "new|excellent|good|fair|poor",
   "size_visible": null,
-  "gender": "unisex",
-  "notable_features": "any logos, edition, accessories included",
-  "search_query": "brand model specific keywords",
+  "gender": "men|women|unisex|unknown",
+  "search_query": "brand model specific 3-5 words for eBay search",
   "confidence": 0.85,
   "is_luxury": false,
   "is_streetwear_sneaker": false,
-  "is_camera_vinyl_collectible": false
+  "is_camera_watch_collectible": false
 }
-If nothing identifiable: {"error":"no_item"}
-ONLY JSON. No markdown. No explanation.`;
+For cameras: include brand + exact model in search_query e.g. "Olympus XA compact film camera"
+For watches: include brand + model e.g. "Casio G-Shock DW5600"
+If nothing identifiable: {"error":"no_item"}`;
 
-    async function analyzeImage(base64, apiKey, provider) {
-      let res, data, text;
+async function identifyItem(b64) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "Authorization":"Bearer "+OPENAI_KEY },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      max_tokens: 600,
+      messages:[{
+        role:"user",
+        content:[
+          { type:"text", text: VISION_PROMPT },
+          { type:"image_url", image_url:{ url:"data:image/jpeg;base64,"+b64, detail:"low" }}
+        ]
+      }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const text = (data.choices?.[0]?.message?.content||"{}").replace(/```json|```/g,"").trim();
+  return JSON.parse(text);
+}
 
-      if (provider === "openai") {
-        // ── OpenAI GPT-4o ──────────────────────────────────────────────────
-        res = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            max_tokens: 800,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "text", text: VISION_PROMPT + "\n\nIdentify this item for resale pricing. JSON only." },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}`, detail: "low" } },
-              ]
-            }]
-          })
-        });
-        data = await res.json();
-        if (data.error) throw new Error(data.error.message || "OpenAI Vision error");
-        text = (data.choices?.[0]?.message?.content || "{}").replace(/```json|```/g, "").trim();
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRICE FETCHERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function simulatePrices(platform, query) {
+  const q = query.toLowerCase();
+  let base = 22;
+  if (/olympus xa/.test(q))           base = 110;
+  else if (/olympus mju|stylus/.test(q)) base = 85;
+  else if (/canon ae.1/.test(q))      base = 130;
+  else if (/leica/.test(q))           base = 800;
+  else if (/polaroid/.test(q))        base = 65;
+  else if (/rolex/.test(q))           base = 3500;
+  else if (/casio/.test(q))           base = 45;
+  else if (/seiko/.test(q))           base = 120;
+  else if (/film camera|analog/.test(q)) base = 60;
+  else if (/nike|adidas/.test(q))     base = 48;
+  else if (/levi/.test(q))            base = 34;
+  else if (/gucci|prada|hermes/.test(q)) base = 320;
+  else if (/zara|h&m|mango/.test(q))  base = 12;
+  else if (/jordan|yeezy/.test(q))    base = 190;
+  else if (/ralph lauren|lacoste/.test(q)) base = 42;
+  else if (/vintage|retro/.test(q))   base *= 1.4;
+  if (/jacket|coat/.test(q)) base *= 1.5;
+  if (/shoes|sneaker/.test(q)) base *= 1.4;
+  const mult = {ebay:.95,vinted:.82,depop:1.1,wallapop:.75,stockx:1.85,leboncoin:.70,subito:.73};
+  const m = mult[platform]||1;
+  const count = 8 + Math.floor(Math.random()*10);
+  const prices = Array.from({length:count},()=>
+    Math.round(base*m*(0.7+Math.random()*.65)*100)/100);
+  const favorites = Array.from({length:count},()=>Math.floor(Math.random()*20));
+  return {prices,favorites,count,simulated:true};
+}
 
-      } else {
-        // ── Anthropic Claude ───────────────────────────────────────────────
-        res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-calls": "true",
-          },
-          body: JSON.stringify({
-            model: ANTHROPIC_MODEL,
-            max_tokens: 800,
-            system: VISION_PROMPT,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-                { type: "text", text: "Identify this item for resale pricing. JSON only." }
-              ]
-            }]
-          })
-        });
-        data = await res.json();
-        if (data.error) throw new Error(data.error.message || "Anthropic Vision error");
-        text = (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
-      }
+async function fetchVinted(query) {
+  try {
+    const url = `https://www.vinted.es/api/v2/catalog/items?search_text=${encodeURIComponent(query)}&per_page=20`;
+    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      {signal:AbortSignal.timeout(7000)});
+    const data = await res.json();
+    const parsed = JSON.parse(data.contents||"{}");
+    const items = parsed.items||[];
+    if (!items.length) return simulatePrices("vinted",query);
+    const prices = items.map(i=>parseFloat(i.price||0)).filter(p=>p>0&&p<3000);
+    const favorites = items.map(i=>i.favourite_count||0);
+    if (prices.length<2) return simulatePrices("vinted",query);
+    return {prices,favorites,count:prices.length,simulated:false};
+  } catch(e) { return simulatePrices("vinted",query); }
+}
 
-      return JSON.parse(text);
+async function fetchWallapop(query) {
+  try {
+    const url = `https://api.wallapop.com/api/v3/general/search?keywords=${encodeURIComponent(query)}&order_by=most_relevance`;
+    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      {signal:AbortSignal.timeout(6000)});
+    const data = await res.json();
+    const parsed = JSON.parse(data.contents||"{}");
+    const items = parsed.search_objects||[];
+    if (!items.length) return simulatePrices("wallapop",query);
+    const prices = items.map(i=>parseFloat(i.price||0)).filter(p=>p>0&&p<3000);
+    if (prices.length<2) return simulatePrices("wallapop",query);
+    return {prices,favorites:prices.map(()=>0),count:prices.length,simulated:false};
+  } catch(e) { return simulatePrices("wallapop",query); }
+}
+
+async function fetchEbay(query) {
+  try {
+    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_ipg=20`;
+    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      {signal:AbortSignal.timeout(6000)});
+    const data = await res.json();
+    const html = data.contents||"";
+    const matches = [...html.matchAll(/s-item__price[^>]*>[\s\S]*?EUR\s*([\d,\.]+)/g)];
+    const prices = matches.map(m=>parseFloat(m[1].replace(",","."))).filter(p=>p>1&&p<5000).slice(0,20);
+    if (prices.length<3) return simulatePrices("ebay",query);
+    return {prices,favorites:prices.map(()=>0),count:prices.length,simulated:false};
+  } catch(e) { return simulatePrices("ebay",query); }
+}
+
+async function fetchApify(platform, query) {
+  if (!APIFY_TOKEN||APIFY_TOKEN==="YOUR_APIFY_TOKEN_HERE") return simulatePrices(platform,query);
+  try {
+    const actor = APIFY_ACTORS[platform];
+    const inputs = {
+      vinted:{searchText:query,maxItems:15},
+      depop:{search:query,maxItems:15},
+      wallapop:{keywords:query,maxItems:15},
+      leboncoin:{searchQuery:query,maxItems:15},
+      subito:{search:query,maxItems:15},
+    };
+    const res = await fetch(
+      `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`,
+      {method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify(inputs[platform]||{query}),signal:AbortSignal.timeout(28000)});
+    if (!res.ok) return simulatePrices(platform,query);
+    const items = await res.json();
+    if (!Array.isArray(items)||!items.length) return simulatePrices(platform,query);
+    const prices = items.map(i=>parseFloat(String(i.price||i.currentPrice||0).replace(/[^0-9.]/g,""))).filter(p=>p>1&&p<5000);
+    if (!prices.length) return simulatePrices(platform,query);
+    return {prices,favorites:items.map(i=>i.favouriteCount||0),count:prices.length,simulated:false};
+  } catch(e) { return simulatePrices(platform,query); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AGGREGATION
+// ═══════════════════════════════════════════════════════════════════════════════
+function aggregate(platformData, item) {
+  const results = {};
+  let allPrices = [];
+  for (const [p,d] of Object.entries(platformData)) {
+    if (!d?.prices?.length) continue;
+    const s = [...d.prices].sort((a,b)=>a-b);
+    const median = s[Math.floor(s.length*.5)];
+    const p25    = s[Math.floor(s.length*.25)];
+    const avgFav = d.favorites.reduce((a,b)=>a+b,0)/(d.favorites.length||1);
+    results[p] = {median,p25,avg:s.reduce((a,b)=>a+b,0)/s.length,count:d.count,avgFav,simulated:d.simulated};
+    allPrices = allPrices.concat(d.prices);
+  }
+  if (!allPrices.length) return null;
+  const W = {vinted:2.2,depop:1.5,stockx:1.8,ebay:1.1,wallapop:.7,leboncoin:.7,subito:.7};
+  let ws=0,wt=0;
+  for (const [p,d] of Object.entries(results)) { const w=W[p]||1; ws+=d.median*w; wt+=w; }
+  const wm = Math.round(ws/wt*100)/100;
+  const as = [...allPrices].sort((a,b)=>a-b);
+  const overallP25    = Math.round(as[Math.floor(as.length*.25)]*100)/100;
+  const overallMedian = Math.round(as[Math.floor(as.length*.5)]*100)/100;
+  const allFavs = Object.values(results).map(r=>r.avgFav);
+  const avgFav  = allFavs.reduce((a,b)=>a+b,0)/(allFavs.length||1);
+  const totalListings = Object.values(results).reduce((s,r)=>s+r.count,0);
+  const demand  = Math.min(avgFav/18,1);
+  const supply  = Math.max(1-totalListings/220,.1);
+  const bonus   = (item?.is_luxury?.15:0)+(item?.is_streetwear_sneaker?.10:0)+(item?.is_camera_watch_collectible?.08:0);
+  const prop    = Math.min(Math.round((demand*.45+supply*.38+bonus+.17)*100),96);
+  return {
+    platforms:results, weightedMedian:wm, overallP25, overallMedian,
+    propensity:prop, totalListings,
+    buyThreshold:Math.round(wm*.45*100)/100,
+    maybeThreshold:Math.round(wm*.60*100)/100,
+    simulated:Object.values(results).some(r=>r.simulated),
+    enriching:false
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN SCAN PIPELINE
+// ═══════════════════════════════════════════════════════════════════════════════
+async function doScan() {
+  const now = Date.now();
+  if (scanning || now-lastScanTime < prefs.interval*1000) return;
+  const b64 = captureFrame();
+  if (!b64) return;
+  lastScanTime = now;
+  scanning = true;
+
+  setScanLine(true);
+  setStatus("🔍 Identifying item...");
+
+  try {
+    const item = await identifyItem(b64);
+    if (item.error || (!item.brand && !item.subcategory)) {
+      setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
+      scanning = false; setScanLine(false); return;
     }
 
-    // ─── FAST PRICE FETCHERS ─────────────────────────────────────────────────
-    // Strategy: eBay direct API (1-2s) + Vinted public API (1-2s) as primary
-    // Apify actors as optional enrichment for other platforms (async, non-blocking)
-
-    // eBay Browse API via allorigins CORS proxy — free, no key needed for basic search
-    async function fetchEbay(query) {
-      try {
-        // Use eBay's public search (no OAuth needed for browse)
-        const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sacat=0&LH_Sold=0&rt=nc&_ipg=20`;
-        const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const res = await fetch(proxy, { signal: AbortSignal.timeout(6000) });
-        const data = await res.json();
-        const html = data.contents || "";
-        // Parse prices from eBay HTML
-        const priceMatches = [...html.matchAll(/s-item__price[^>]*>[\s\S]*?EUR\s*([\d,\.]+)/g)];
-        const prices = priceMatches
-          .map(m => parseFloat(m[1].replace(",", ".")))
-          .filter(p => p > 1 && p < 5000)
-          .slice(0, 20);
-        if (prices.length < 3) return simulatePrices("ebay", query);
-        return { prices, favorites: prices.map(() => 0), count: prices.length, simulated: false };
-      } catch {
-        return simulatePrices("ebay", query);
-      }
+    // Show clarify if needed
+    if (item.confidence < 0.55 || !item.brand) {
+      scanning = false; setScanLine(false);
+      showClarify(item, b64);
+      return;
     }
 
-    // Vinted public search API — no auth, fast, returns JSON
-    async function fetchVinted(query) {
-      try {
-        const params = new URLSearchParams({
-          search_text: query,
-          order: "relevance",
-          per_page: "20",
-        });
-        // CORS proxy needed for Vinted
-        const vintedUrl = `https://www.vinted.es/api/v2/catalog/items?${params}`;
-        const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(vintedUrl)}`;
-        const res = await fetch(proxy, { signal: AbortSignal.timeout(7000) });
-        const data = await res.json();
-        const parsed = JSON.parse(data.contents || "{}");
-        const items = parsed.items || [];
-        if (!items.length) return simulatePrices("vinted", query);
-        const prices = items
-          .map(i => parseFloat(i.price || i.total_item_price?.amount || 0))
-          .filter(p => p > 0 && p < 3000);
-        const favorites = items.map(i => i.favourite_count || 0);
-        if (prices.length < 2) return simulatePrices("vinted", query);
-        return { prices, favorites, count: prices.length, simulated: false };
-      } catch {
-        return simulatePrices("vinted", query);
-      }
+    setStatus("📡 Fetching prices...");
+    await fetchAndShow(item, b64);
+  } catch(e) {
+    setErr("Error: " + e.message);
+  } finally {
+    scanning = false;
+    setScanLine(false);
+  }
+}
+
+function setScanLine(on) {
+  document.getElementById("scan-line").style.display = on ? "block" : "none";
+}
+
+async function fetchAndShow(item, b64) {
+  const q = item.search_query;
+  const raw = {};
+
+  // Phase 1: fast direct APIs
+  const fast = {};
+  if (prefs.platforms.includes("ebay"))     fast.ebay     = fetchEbay(q);
+  if (prefs.platforms.includes("vinted"))   fast.vinted   = fetchVinted(q);
+  if (prefs.platforms.includes("wallapop")) fast.wallapop = fetchWallapop(q);
+
+  await Promise.all(Object.entries(fast).map(async([p,t])=>{
+    try{ raw[p]=await t; } catch(e){ raw[p]=simulatePrices(p,q); }
+  }));
+
+  const fastAgg = aggregate(raw, item);
+  if (!fastAgg) { setErr("Could not get prices."); return; }
+
+  // Save and show immediately
+  currentItem = item;
+  currentPrices = {...fastAgg, enriching:true};
+  currentB64 = b64;
+  currentScan = {
+    id:Date.now(), ts:new Date().toISOString(), tsDisplay:new Date().toLocaleTimeString(),
+    brand:item.brand||"Unknown", model:item.model||"",
+    category:item.category||"other", subcategory:item.subcategory||"",
+    color:item.color||"", condition:item.condition_estimate||"good",
+    search_query:q, prices:fastAgg, thumb:b64, decision:null, mktPrice:null
+  };
+
+  dbSave(currentScan).catch(()=>{});
+  renderDetail();
+  showScreen("detail");
+
+  // Phase 2: background enrichment via Apify
+  const slow = ["depop","leboncoin","subito","stockx"].filter(p=>{
+    if (!prefs.platforms.includes(p)) return false;
+    if (p==="stockx" && !item.is_streetwear_sneaker) return false;
+    return true;
+  });
+
+  Promise.all(slow.map(async p=>{
+    try{ raw[p]=await fetchApify(p,q); } catch(e){ raw[p]=simulatePrices(p,q); }
+  })).then(()=>{
+    const enriched = aggregate(raw, item);
+    if (enriched) {
+      currentPrices = {...enriched, enriching:false};
+      if (currentScan) { currentScan.prices = enriched; dbSave(currentScan).catch(()=>{}); }
+      updateDetailPrices();
     }
+  });
+}
 
-    // Wallapop public API
-    async function fetchWallapop(query) {
-      try {
-        const url = `https://api.wallapop.com/api/v3/general/search?keywords=${encodeURIComponent(query)}&language=en&filters_source=quick_filters&order_by=most_relevance`;
-        const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const res = await fetch(proxy, { signal: AbortSignal.timeout(6000) });
-        const data = await res.json();
-        const parsed = JSON.parse(data.contents || "{}");
-        const items = parsed.search_objects || [];
-        if (!items.length) return simulatePrices("wallapop", query);
-        const prices = items
-          .map(i => parseFloat(i.price || 0))
-          .filter(p => p > 0 && p < 3000);
-        if (prices.length < 2) return simulatePrices("wallapop", query);
-        return { prices, favorites: prices.map(() => 0), count: prices.length, simulated: false };
-      } catch {
-        return simulatePrices("wallapop", query);
-      }
-    }
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLARIFY FLOW
+// ═══════════════════════════════════════════════════════════════════════════════
+let clarifyItem = null;
+let clarifyB64  = null;
+let clarifyStep = null;
 
-    // Apify — used for Depop, Vestiaire, LeBonCoin, Subito (slower, non-blocking)
-    async function fetchApify(platform, query, token) {
-      if (!token) return simulatePrices(platform, query);
-      try {
-        const actor = APIFY_ACTORS[platform];
-        const inputs = {
-          depop:     { search: query, maxItems: 15 },
-          vestiaire: { search: query, maxResults: 15 },
-          leboncoin: { searchQuery: query, maxItems: 15 },
-          subito:    { search: query, maxItems: 15 },
-        };
-        const res = await fetch(
-          `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${token}&timeout=25&memory=256`,
-          { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(inputs[platform] || { query }),
-            signal: AbortSignal.timeout(28000) }
-        );
-        if (!res.ok) return simulatePrices(platform, query);
-        const items = await res.json();
-        if (!Array.isArray(items) || !items.length) return simulatePrices(platform, query);
-        const prices = items
-          .map(i => parseFloat(String(i.price || i.currentPrice || i.salePrice || 0).replace(/[^0-9.]/g, "")))
-          .filter(p => p > 1 && p < 5000);
-        if (!prices.length) return simulatePrices(platform, query);
-        const favorites = items.map(i => i.favouriteCount || i.likes || 0);
-        return { prices, favorites, count: prices.length, simulated: false };
-      } catch {
-        return simulatePrices(platform, query);
-      }
-    }
+function showClarify(item, b64) {
+  clarifyItem = item; clarifyB64 = b64; clarifyStep = item.brand ? "condition" : "brand";
 
-    // Realistic fallback when live fetch fails
-    function simulatePrices(platform, query) {
-      const q = query.toLowerCase();
-      let base = 22;
-      // Cameras & collectibles
-      if (/olympus xa/.test(q)) base = 110;
-      else if (/olympus mju|stylus/.test(q)) base = 85;
-      else if (/canon ae-1|ae1/.test(q)) base = 130;
-      else if (/pentax/.test(q)) base = 75;
-      else if (/leica/.test(q)) base = 800;
-      else if (/polaroid/.test(q)) base = 65;
-      else if (/film camera|analog camera/.test(q)) base = 60;
-      // Clothing brands
-      else if (/nike|adidas|puma|new balance/.test(q)) base = 48;
-      else if (/levi|levis/.test(q)) base = 34;
-      else if (/gucci|louis vuitton|prada|hermes|chanel/.test(q)) base = 320;
-      else if (/zara|h&m|mango/.test(q)) base = 12;
-      else if (/jordan|yeezy/.test(q)) base = 190;
-      else if (/ralph lauren|tommy|lacoste/.test(q)) base = 42;
-      // Modifiers
-      if (/vintage|retro/.test(q)) base *= 1.4;
-      if (/jacket|coat|blazer/.test(q)) base *= 1.5;
-      if (/shoes|sneaker/.test(q)) base *= 1.4;
+  const overlay = document.createElement("div");
+  overlay.id = "clarify-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(8,8,16,.95);z-index:200;display:flex;flex-direction:column;justify-content:flex-end";
 
-      const mult = { ebay:0.95, vinted:0.82, depop:1.1, wallapop:0.75, stockx:1.85, leboncoin:0.70, subito:0.73 };
-      const m = mult[platform] || 1;
-      const count = 8 + Math.floor(Math.random() * 10);
-      const prices = Array.from({ length: count }, () =>
-        Math.round(base * m * (0.7 + Math.random() * 0.65) * 100) / 100
-      );
-      const favorites = Array.from({ length: count }, () => Math.floor(Math.random() * 20));
-      return { prices, favorites, count, simulated: true };
-    }
+  const sheet = document.createElement("div");
+  sheet.style.cssText = "background:#0d0d1a;border-top:2px solid #00ff87;border-radius:20px 20px 0 0;padding:24px;padding-bottom:40px";
 
-    // ─── AGGREGATION ─────────────────────────────────────────────────────────
-    function aggregate(platformData, item) {
-      const results = {};
-      let allPrices = [];
-      for (const [p, d] of Object.entries(platformData)) {
-        if (!d?.prices?.length) continue;
-        const s = [...d.prices].sort((a, b) => a - b);
-        const median = s[Math.floor(s.length * 0.5)];
-        const p25    = s[Math.floor(s.length * 0.25)];
-        const p75    = s[Math.floor(s.length * 0.75)];
-        const avg    = s.reduce((a, b) => a + b, 0) / s.length;
-        const avgFav = d.favorites.reduce((a, b) => a + b, 0) / (d.favorites.length || 1);
-        results[p] = { median, p25, p75, avg, count: d.count, avgFav, simulated: d.simulated };
-        allPrices = allPrices.concat(d.prices);
-      }
-      if (!allPrices.length) return null;
-
-      // Weighted median — Vinted + Vestiaire weighted highest as sell targets
-      const W = { vinted:2.2, depop:1.5, stockx:1.8, ebay:1.1, wallapop:0.7, leboncoin:0.7, subito:0.7 };
-      let ws = 0, wt = 0;
-      for (const [p, d] of Object.entries(results)) {
-        const w = W[p] || 1;
-        ws += d.median * w; wt += w;
-      }
-      const weightedMedian = Math.round(ws / wt * 100) / 100;
-
-      const as = [...allPrices].sort((a, b) => a - b);
-      const overallP25    = Math.round(as[Math.floor(as.length * 0.25)] * 100) / 100;
-      const overallMedian = Math.round(as[Math.floor(as.length * 0.50)] * 100) / 100;
-
-      const allFavs = Object.values(results).map(r => r.avgFav);
-      const avgFav  = allFavs.reduce((a, b) => a + b, 0) / (allFavs.length || 1);
-      const totalListings = Object.values(results).reduce((s, r) => s + r.count, 0);
-
-      const demandScore   = Math.min(avgFav / 18, 1);
-      const supplyScore   = Math.max(1 - totalListings / 220, 0.1);
-      const luxBonus      = item?.is_luxury ? 0.12 : 0;
-      const sneakerBonus  = item?.is_streetwear_sneaker ? 0.10 : 0;
-      const propensity    = Math.min(Math.round((demandScore * 0.45 + supplyScore * 0.38 + luxBonus + sneakerBonus + 0.17) * 100), 96);
-
-      return {
-        platforms: results,
-        weightedMedian,
-        overallP25,
-        overallMedian,
-        propensity,
-        buyThreshold:   Math.round(weightedMedian * 0.45 * 100) / 100,
-        maybeThreshold: Math.round(weightedMedian * 0.60 * 100) / 100,
-        totalListings,
-        simulated: Object.values(results).some(r => r.simulated),
-      };
-    }
-
-    function buySignal(marketPrice, pd) {
-      if (!pd || !marketPrice) return null;
-      const mp = parseFloat(marketPrice);
-      if (isNaN(mp) || mp <= 0) return null;
-      const margin = Math.round((pd.weightedMedian - mp) / mp * 100);
-      if (mp <= pd.buyThreshold)   return { label: "BUY",   icon: "✅", color: "#00ff87", margin };
-      if (mp <= pd.maybeThreshold) return { label: "MAYBE", icon: "⚠️", color: "#ffd600", margin };
-      return { label: "PASS", icon: "❌", color: "#ff4444", margin };
-    }
-
-
-    // ─── PERSISTENT DATABASE (IndexedDB) ─────────────────────────────────────
-    // Stores every scan permanently — survives page reloads, shared across users
-    // on the same device. Powers the RAG context for future AI price improvement.
-
-    const DB_NAME    = "thriftlens_db";
-    const DB_VERSION = 1;
-    const STORE      = "scans";
-
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = e => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains(STORE)) {
-            const store = db.createObjectStore(STORE, { keyPath: "id" });
-            store.createIndex("category",     "category",     { unique: false });
-            store.createIndex("brand",        "brand",        { unique: false });
-            store.createIndex("decision",     "decision",     { unique: false });
-            store.createIndex("ts",           "ts",           { unique: false });
-          }
-        };
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror   = e => reject(e.target.error);
+  if (clarifyStep === "brand") {
+    const brands = ["Nike","Adidas","Zara","H&M","Levi's","Ralph Lauren","Mango","Pull&Bear","Casio","Seiko","Olympus","Canon","Unknown"];
+    sheet.innerHTML = `
+      <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Help me identify</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">Which brand is it?</div>
+      <div style="font-size:12px;color:#555;margin-bottom:20px">Check the label · ${item.subcategory||""} · ${item.color||""}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        ${brands.map(b=>`<button onclick="pickBrand('${b}')" style="padding:12px 8px;border-radius:10px;border:1px solid #2a2a3e;background:transparent;color:#e8e8f0;font-size:13px;font-family:inherit;cursor:pointer">${b}</button>`).join("")}
+      </div>
+      <input id="brand-input" style="width:100%;background:#080810;border:1px solid #2a2a3e;border-radius:8px;padding:12px;color:#e8e8f0;font-size:14px;font-family:inherit;margin-bottom:12px" placeholder="Type brand name + Enter...">
+      <button onclick="closeClarify()" style="width:100%;padding:12px;background:transparent;border:1px solid #2a2a3e;border-radius:10px;color:#555;font-size:12px;font-family:inherit;cursor:pointer">← Cancel</button>`;
+    setTimeout(()=>{
+      const inp = document.getElementById("brand-input");
+      if (inp) inp.addEventListener("keydown", e=>{
+        if (e.key==="Enter"&&e.target.value.trim()) pickBrand(e.target.value.trim());
       });
-    }
-
-    async function dbSaveScan(scan) {
-      const db    = await openDB();
-      const tx    = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(scan);
-      return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
-    }
-
-    async function dbLoadAll() {
-      const db    = await openDB();
-      const tx    = db.transaction(STORE, "readonly");
-      const store = tx.objectStore(STORE);
-      return new Promise((res, rej) => {
-        const req = store.getAll();
-        req.onsuccess = e => res(e.target.result.reverse()); // newest first
-        req.onerror   = rej;
-      });
-    }
-
-    async function dbGetSimilar(brand, category, limit = 5) {
-      const all = await dbLoadAll();
-      return all
-        .filter(s => s.brand === brand || s.category === category)
-        .slice(0, limit);
-    }
-
-    async function dbStats() {
-      const all = await dbLoadAll();
-      const bought  = all.filter(s => s.decision === "buy").length;
-      const passed  = all.filter(s => s.decision === "pass").length;
-      const cats    = {};
-      all.forEach(s => { cats[s.category] = (cats[s.category] || 0) + 1; });
-      const topCat  = Object.entries(cats).sort((a,b) => b[1]-a[1])[0];
-      return { total: all.length, bought, passed, topCat: topCat?.[0] || "—", cats };
-    }
-
-    // ─── APP ─────────────────────────────────────────────────────────────────
-    function App() {
-      // ── ALL REFS ─────────────────────────────────────────────────────────────
-      const videoRef  = useRef(null);
-      const canvasRef = useRef(null);
-      const streamRef = useRef(null);
-      const timerRef  = useRef(null);
-      const lastScan  = useRef(0);
-
-      // ── ALL STATE (must come before any useEffect) ───────────────────────────
-      const OPENAI_KEY  = "YOUR_OPENAI_KEY_HERE";
-      const APIFY_TOKEN = "YOUR_APIFY_TOKEN_HERE";
-      const AI_PROVIDER = "openai";
-
-      const [screen, setScreen]           = useState("cam");
-      const [cfg, setCfg]                 = useState(() => {
-        try {
-          const saved = JSON.parse(localStorage.getItem("thriftlens_prefs") || "{}");
-          return { interval:3, autoScan:true, ...saved };
-        } catch { return { interval:3, autoScan:true }; }
-      });
-      const [platforms, setPlatforms]     = useState(Object.keys(PLATFORMS));
-      const [camReady, setCamReady]       = useState(false);
-      const [busy, setBusy]               = useState(false);
-      const [progress, setProgress]       = useState("");
-      const [item, setItem]               = useState(null);
-      const [prices, setPrices]           = useState(null);
-      const [history, setHistory]         = useState([]);
-      const [dbStats_, setDbStats]        = useState(null);
-      const [clarify, setClarify]         = useState(null);
-      const [mktPrice, setMktPrice]       = useState("");
-      const [currentScan, setCurrentScan] = useState(null);
-      const [err, setErr]                 = useState("");
-
-      // ── ALL EFFECTS (after all state) ────────────────────────────────────────
-      useEffect(() => {
-        try { localStorage.setItem("thriftlens_prefs", JSON.stringify(cfg)); } catch {}
-      }, [cfg]);
-
-      useEffect(() => {
-        dbLoadAll().then(rows => setHistory(rows)).catch(() => {});
-        dbStats().then(setDbStats).catch(() => {});
-      }, []);
-
-      // Camera
-      const startCam = useCallback(async () => {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
-          });
-          streamRef.current = s;
-          videoRef.current.srcObject = s;
-          await videoRef.current.play();
-          setCamReady(true);
-          setErr("");
-        } catch(e) {
-          setErr("Camera blocked. Open this page in Safari and allow camera access.");
-        }
-      }, []);
-
-      const stopCam = useCallback(() => {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        clearInterval(timerRef.current);
-        setCamReady(false);
-      }, []);
-
-      const capture = useCallback(() => {
-        const v = videoRef.current, c = canvasRef.current;
-        if (!v || !c || v.readyState < 2) return null;
-        c.width = v.videoWidth; c.height = v.videoHeight;
-        c.getContext("2d").drawImage(v, 0, 0);
-        return c.toDataURL("image/jpeg", 0.82).split(",")[1];
-      }, []);
-
-      // Main scan
-      const scan = useCallback(async () => {
-        const now = Date.now();
-        if (busy || now - lastScan.current < cfg.interval * 1000) return;
-        lastScan.current = now;
-
-        const b64 = capture();
-        if (!b64) return;
-
-        setBusy(true); setErr(""); setPrices(null);
-
-        try {
-          setProgress("🔍 Identifying item...");
-          const identified = await analyzeImage(b64, OPENAI_KEY, AI_PROVIDER);
-
-          if (identified.error || (!identified.brand && !identified.subcategory)) {
-            setBusy(false);
-            setProgress("👁 Point at an item...");
-            return;
-          }
-
-          // Low confidence or unknown brand → ask clarifying questions first
-          if (!identified.error && (identified.confidence < 0.55 || !identified.brand)) {
-            const needsBrand    = !identified.brand;
-            const needsCategory = !identified.category || identified.category === "other";
-            if (needsBrand || needsCategory) {
-              setBusy(false);
-              setClarify({
-                pendingItem: identified,
-                pendingB64: b64,
-                step: needsBrand ? "brand" : "condition",
-              });
-              return;
-            }
-          }
-
-          // Parallel fetches
-          await runPriceFetch(identified, b64);
-        } catch(e) {
-          setErr("Error: " + e.message);
-        } finally {
-          setBusy(false);
-          setProgress("");
-        }
-      }, [busy, cfg, capture, platforms]);
-
-
-      // ── Price fetch helper (reused by scan + clarify confirm) ───────────────
-      const runPriceFetch = useCallback(async (identified, b64) => {
-        setBusy(true);
-        const q = identified.search_query;
-        const raw = {};
-
-        // ── PHASE 1: Fast sources first (~2-3s) — show result immediately ──────
-        setProgress("⚡ Getting prices...");
-        const fastTasks = {};
-        if (platforms.includes("ebay"))    fastTasks.ebay    = fetchEbay(q);
-        if (platforms.includes("vinted"))  fastTasks.vinted  = fetchVinted(q);
-        if (platforms.includes("wallapop")) fastTasks.wallapop = fetchWallapop(q);
-
-        await Promise.all(Object.entries(fastTasks).map(async ([p, t]) => {
-          try { raw[p] = await t; } catch { raw[p] = simulatePrices(p, q); }
-        }));
-
-        // Show result immediately after fast sources → stop camera, go to detail
-        const fastAgg = aggregate(raw, identified);
-        if (fastAgg) {
-          const scanEntry = {
-            id:        Date.now(),
-            ts:        new Date().toISOString(),
-            tsDisplay: new Date().toLocaleTimeString(),
-            brand:     identified.brand || "Unknown",
-            model:     identified.model || "",
-            category:  identified.category || "other",
-            subcategory: identified.subcategory || "",
-            color:     identified.color || "",
-            condition: identified.condition_estimate || "good",
-            search_query: identified.search_query,
-            prices:    fastAgg,
-            thumb:     b64,
-            decision:  null,   // "buy" | "pass" — set when user decides
-            mktPrice:  null,
-          };
-          setItem(identified);
-          setPrices({ ...fastAgg, enriching: true });
-          setMktPrice("");
-          setCurrentScan(scanEntry);
-          stopCam();                        // stop camera — user is reading
-          clearInterval(timerRef.current);
-          setScreen("detail");
-          setBusy(false);
-          setProgress("");
-          // Persist to IndexedDB immediately (decision updated later)
-          dbSaveScan(scanEntry).catch(() => {});
-          setHistory(h => [scanEntry, ...h.slice(0, 99)]);
-          dbStats().then(setDbStats).catch(() => {});
-        }
-
-        // ── PHASE 2: Apify sources in background (non-blocking) ──────────────
-        const slowPlatforms = ["depop","leboncoin","subito","stockx"].filter(p => {
-          if (!platforms.includes(p)) return false;
-          if (p === "stockx" && !identified.is_streetwear_sneaker) return false;
-          return true;
-        });
-
-        if (slowPlatforms.length && APIFY_TOKEN && APIFY_TOKEN !== "YOUR_APIFY_TOKEN_HERE") {
-          Promise.all(slowPlatforms.map(async p => {
-            try { raw[p] = await fetchApify(p, q, APIFY_TOKEN); }
-            catch { raw[p] = simulatePrices(p, q); }
-          })).then(() => {
-            const enrichedAgg = aggregate(raw, identified);
-            if (enrichedAgg) {
-              setPrices(prev => ({ ...enrichedAgg, enriching: false }));
-              setCurrentScan(prev => {
-                if (!prev) return prev;
-                const updated = { ...prev, prices: enrichedAgg };
-                dbSaveScan(updated).catch(() => {});
-                return updated;
-              });
-              setHistory(h => h.map((e, i) => i === 0 ? { ...e, prices: enrichedAgg } : e));
-            }
-          });
-        } else {
-          setPrices(p => p ? { ...p, enriching: false } : p);
-        }
-
-        setBusy(false);
-        setProgress("");
-      }, [platforms]);
-
-
-      const recordDecision = useCallback((decision) => {
-        const mp = parseFloat(mktPrice) || null;
-        setCurrentScan(prev => {
-          if (!prev) return prev;
-          const updated = { ...prev, decision, mktPrice: mp };
-          dbSaveScan(updated).catch(() => {});
-          setHistory(h => h.map(e => e.id === updated.id ? updated : e));
-          dbStats().then(setDbStats).catch(() => {});
-          return updated;
-        });
-        // Restart camera for next scan
-        setItem(null); setPrices(null); setMktPrice(""); setCurrentScan(null);
-        setScreen("cam");
-        startCam();
-      }, [mktPrice, startCam]);
-
-      // ── Clarify confirm handler ──────────────────────────────────────────────
-      const confirmClarify = useCallback(async (answers) => {
-        if (!clarify) return;
-        const updated = {
-          ...clarify.pendingItem,
-          ...answers,
-          search_query: [answers.brand, clarify.pendingItem.subcategory, clarify.pendingItem.color]
-            .filter(Boolean).join(" ").trim() || clarify.pendingItem.search_query,
-        };
-        setClarify(null);
-        setItem(updated);
-        await runPriceFetch(updated, clarify.pendingB64);
-      }, [clarify, runPriceFetch]);
-
-      // Auto-start camera when app loads on cam screen
-      useEffect(() => { startCam(); }, []);
-
-      // Auto-scan loop
-      useEffect(() => {
-        if (screen === "cam" && camReady && cfg.autoScan) {
-          timerRef.current = setInterval(scan, cfg.interval * 1000);
-        }
-        return () => clearInterval(timerRef.current);
-      }, [screen, camReady, cfg.autoScan, cfg.interval, scan]);
-
-      const signal = buySignal(mktPrice, prices);
-
-      // ── SCREENS ─────────────────────────────────────────────────────────────
-
-      const S = {
-        // shared
-        app:   { background:"#080810", minHeight:"100vh", color:"#e8e8f0", fontFamily:"'DM Mono', monospace", maxWidth:430, margin:"0 auto" },
-        hdr:   { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:"1px solid #1a1a2e", background:"rgba(8,8,16,0.97)", position:"sticky", top:0, zIndex:100 },
-        logo:  { fontSize:15, letterSpacing:4, color:"#8080a0", fontWeight:300 },
-        logoG: { color:"#00ff87", fontWeight:700 },
-        tabs:  { display:"flex", gap:4 },
-        tab:   { background:"transparent", border:"1px solid #1a1a2e", color:"#666", padding:"6px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontFamily:"inherit" },
-        tabA:  { background:"#00ff8710", borderColor:"#00ff87", color:"#00ff87" },
-        // setup
-        setup: { padding:16, paddingBottom:60 },
-        h2:    { fontSize:11, letterSpacing:4, color:"#8080a0", marginBottom:16, textTransform:"uppercase" },
-        card:  { background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:16, marginBottom:12 },
-        lbl:   { display:"block", fontSize:10, letterSpacing:2, color:"#00ff87", marginBottom:6, textTransform:"uppercase" },
-        hint:  { fontSize:11, color:"#555", marginBottom:10, lineHeight:1.5 },
-        inp:   { width:"100%", background:"#080810", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 12px", color:"#e8e8f0", fontSize:13, fontFamily:"inherit" },
-        pgrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 },
-        chips: { display:"flex", gap:8, flexWrap:"wrap" },
-        chip:  { padding:"7px 14px", borderRadius:20, border:"1px solid #2a2a3e", background:"transparent", color:"#666", cursor:"pointer", fontSize:12, fontFamily:"inherit" },
-        chipA: { background:"#00ff8720", borderColor:"#00ff87", color:"#00ff87" },
-        cta:   { width:"100%", padding:16, background:"linear-gradient(135deg,#00ff87,#00ccff)", border:"none", borderRadius:12, color:"#080810", fontWeight:700, fontSize:15, fontFamily:"inherit", cursor:"pointer", letterSpacing:2, marginTop:8 },
-        // cam
-        camWrap:  { position:"relative", width:"100%", background:"#000", flexShrink:0 },
-        video:    { width:"100%", display:"block", maxHeight:"55vh", objectFit:"cover" },
-        overlay:  { position:"absolute", inset:0, pointerEvents:"none" },
-        corners:  { position:"absolute", inset:"15%" },
-        corner:   { position:"absolute", width:22, height:22 },
-        sbar:     { position:"absolute", bottom:0, left:0, right:0, padding:"8px 16px", background:"linear-gradient(transparent,rgba(8,8,16,.9))" },
-        stxt:     { fontSize:12, color:"#00ff87", letterSpacing:1 },
-        manualBtn:{ position:"absolute", bottom:10, right:12, width:54, height:54, borderRadius:"50%", background:"#00ff87", border:"none", fontSize:26, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
-        // result
-        rcard:  { background:"#0a0a16", borderTop:"2px solid #00ff87", padding:16, overflowY:"auto" },
-        rbrand: { fontSize:22, fontWeight:700, letterSpacing:1 },
-        rdet:   { fontSize:12, color:"#8080a0", marginTop:4, letterSpacing:1 },
-        rcond:  { display:"inline-block", marginTop:6, padding:"3px 10px", background:"#00ff8715", border:"1px solid #00ff8740", borderRadius:20, fontSize:10, color:"#00ff87", letterSpacing:1 },
-        rconf:  { width:44, height:44, borderRadius:"50%", background:"#00ff8715", border:"2px solid #00ff8740", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#00ff87", flexShrink:0 },
-        pmain:  { display:"flex", justifyContent:"space-between", alignItems:"baseline", margin:"16px 0 6px" },
-        plbl:   { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase" },
-        pval:   { fontSize:34, fontWeight:700 },
-        prow:   { display:"flex", alignItems:"center", gap:8, fontSize:10, color:"#555", marginBottom:16 },
-        pbar:   { flex:1, height:4, background:"#1a1a2e", borderRadius:2, position:"relative", overflow:"hidden" },
-        pbfill: { position:"absolute", left:0, top:0, height:"100%", background:"#00ff87", borderRadius:2 },
-        pblist: { background:"#080810", border:"1px solid #1a1a2e", borderRadius:10, padding:"4px 0", marginBottom:16 },
-        pbrow:  { display:"flex", alignItems:"center", padding:"9px 14px", borderBottom:"1px solid #0d0d1a" },
-        pbn:    { flex:1, fontSize:12, color:"#8080a0" },
-        pbp:    { fontSize:14, fontWeight:700, marginRight:10 },
-        pbc:    { fontSize:10, color:"#444" },
-        propS:  { marginBottom:16 },
-        propL:  { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase", marginBottom:8 },
-        propB:  { height:7, background:"#1a1a2e", borderRadius:4, overflow:"hidden", marginBottom:6 },
-        propV:  { fontSize:14, fontWeight:600 },
-        calc:   { background:"#080810", border:"1px solid #1a1a2e", borderRadius:12, padding:14, marginBottom:14 },
-        calcL:  { fontSize:10, color:"#8080a0", letterSpacing:2, textTransform:"uppercase", marginBottom:10 },
-        calcR:  { display:"flex", gap:10, alignItems:"center", marginBottom:8 },
-        calcI:  { flex:1, background:"#0d0d1a", border:"1px solid #2a2a3e", borderRadius:8, padding:"10px 12px", color:"#e8e8f0", fontSize:18, fontFamily:"inherit" },
-        calcSig:{ padding:"8px 12px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:700, letterSpacing:1, display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 },
-        thresh: { display:"flex", justifyContent:"space-between", fontSize:10, color:"#555" },
-        simnote:{ textAlign:"center", fontSize:10, color:"#444", padding:"8px 0", borderTop:"1px solid #1a1a2e", marginBottom:12 },
-        actrow: { display:"flex", gap:10 },
-        actbtn: { flex:1, padding:13, background:"#00ff8720", border:"1px solid #00ff8740", borderRadius:10, color:"#00ff87", fontSize:12, fontFamily:"inherit", cursor:"pointer", letterSpacing:1 },
-        actbtn2:{ flex:1, padding:13, background:"#1a1a2e", border:"1px solid #2a2a3e", borderRadius:10, color:"#8080a0", fontSize:12, fontFamily:"inherit", cursor:"pointer", letterSpacing:1 },
-        errBox: { margin:16, padding:14, background:"#ff444415", border:"1px solid #ff444440", borderRadius:10, fontSize:12, color:"#ff6666" },
-        // history
-        hpanel:{ padding:16, paddingBottom:60 },
-        hcard: { display:"flex", gap:12, background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:12, marginBottom:10 },
-        hthumb:{ width:66, height:66, objectFit:"cover", borderRadius:8, flexShrink:0 },
-        hbrand:{ fontSize:14, fontWeight:600, marginBottom:4 },
-        hprice:{ fontSize:13, color:"#00ff87", marginBottom:2 },
-        hts:   { fontSize:10, color:"#555", marginBottom:4 },
-        hthr:  { fontSize:10, color:"#666" },
-        empty: { textAlign:"center", color:"#444", padding:"60px 20px", fontSize:14 },
-        tgl:   { width:46, height:24, borderRadius:12, border:"none", cursor:"pointer", position:"relative", padding:2, display:"flex", alignItems:"center" },
-        tglk:  { width:18, height:18, borderRadius:"50%", background:"#fff", transition:"transform 0.2s" },
-      };
-
-      const tabStyle  = t => ({ ...S.tab,  ...(screen===t ? S.tabA : {}) });
-      const chipStyle = v => ({ ...S.chip, ...(cfg.interval===v ? S.chipA : {}) });
-
-      const togglePlatform = k => setPlatforms(prev =>
-        prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]
-      );
-
-      return (
-        <div style={S.app}>
-
-          {/* ── HEADER ── */}
-          <header style={S.hdr}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{ fontSize:20 }}>🏷️</span>
-              <span style={S.logo}>THRIFT<span style={S.logoG}>LENS</span></span>
-            </div>
-            <div style={S.tabs}>
-              <button style={tabStyle("cam")} onClick={() => { setScreen("cam"); startCam(); }}>📷 Scan</button>
-              <button style={{ ...tabStyle("history"), ...(screen==="detail"?S.tabA:{}) }}
-                onClick={() => { stopCam(); setScreen("history"); }}>
-                🗂 {history.length > 0 ? history.length : ""}
-              </button>
-              <button style={tabStyle("setup")} onClick={() => { stopCam(); setScreen("setup"); }}>⚙️</button>
-            </div>
-          </header>
-
-          {/* ── PREFERENCES (no API keys exposed to users) ── */}
-          {screen === "setup" && (
-            <div style={S.setup} className="fade-in">
-              <div style={S.h2}>Preferences</div>
-
-              <div style={S.card}>
-                <label style={S.lbl}>Auto-scan interval</label>
-                <p style={S.hint}>How often to capture a frame while scanning.</p>
-                <div style={S.chips}>
-                  {[2,3,5,8].map(v => (
-                    <button key={v} style={chipStyle(v)} onClick={() => setCfg(c => ({ ...c, interval: v }))}>{v}s</button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ ...S.card, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div>
-                  <label style={{ ...S.lbl, marginBottom:2 }}>Auto-scan</label>
-                  <p style={{ ...S.hint, marginBottom:0 }}>Scan continuously or tap manually.</p>
-                </div>
-                <button style={{ ...S.tgl, background: cfg.autoScan ? "#00ff87" : "#333" }}
-                  onClick={() => setCfg(c => ({ ...c, autoScan: !c.autoScan }))}>
-                  <div style={{ ...S.tglk, transform: cfg.autoScan ? "translateX(22px)" : "translateX(0)" }} />
-                </button>
-              </div>
-
-              <div style={S.card}>
-                <label style={S.lbl}>Active Platforms</label>
-                <div style={S.pgrid}>
-                  {Object.entries(PLATFORMS).map(([k, p]) => {
-                    const active = platforms.includes(k);
-                    return (
-                      <button key={k} onClick={() => togglePlatform(k)} style={{
-                        padding:"9px 10px", borderRadius:8, border:"1px solid",
-                        cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all 0.2s",
-                        background: active ? p.color+"22" : "transparent",
-                        borderColor: active ? p.color : "#333",
-                        color: active ? p.color : "#555",
-                      }}>
-                        {p.emoji} {p.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button style={S.cta} onClick={() => { setScreen("cam"); startCam(); }}>
-                📷 Start Scanning
-              </button>
-            </div>
-          )}
-
-          {/* ── CAMERA ── */}
-          {screen === "cam" && (
-            <div style={{ display:"flex", flexDirection:"column" }}>
-              <div style={S.camWrap}>
-                <video ref={videoRef} style={S.video} playsInline muted autoPlay />
-                <canvas ref={canvasRef} style={{ display:"none" }} />
-                <div style={S.overlay}>
-                  {[
-                    { top:"18%", left:"12%", borderTop:"3px solid #00ff87", borderLeft:"3px solid #00ff87" },
-                    { top:"18%", right:"12%", borderTop:"3px solid #00ff87", borderRight:"3px solid #00ff87" },
-                    { bottom:"18%", left:"12%", borderBottom:"3px solid #00ff87", borderLeft:"3px solid #00ff87" },
-                    { bottom:"18%", right:"12%", borderBottom:"3px solid #00ff87", borderRight:"3px solid #00ff87" },
-                  ].map((c, i) => <div key={i} style={{ position:"absolute", width:24, height:24, ...c }} />)}
-                  {busy && <div className="scan-line" style={{ position:"absolute", left:"12%", right:"12%", height:2, background:"linear-gradient(90deg,transparent,#00ff87,transparent)" }} />}
-                </div>
-                <div style={S.sbar}>
-                  <span style={S.stxt} className={busy ? "pulse" : ""}>
-                    {busy ? progress : camReady ? (cfg.autoScan ? "⚡ Auto-scanning every "+cfg.interval+"s" : "Tap 📸 to scan") : "Starting camera..."}
-                  </span>
-                </div>
-                {!cfg.autoScan && (
-                  <button style={S.manualBtn} onClick={scan} disabled={busy}>{busy ? "⏳" : "📸"}</button>
-                )}
-              </div>
-              {err && <div style={S.errBox}>{err}</div>}
-            </div>
-          )}
-
-          {/* ── DETAIL SCREEN (no camera, full focus on decision) ── */}
-          {screen === "detail" && item && prices && (
-            <div style={{ ...S.hpanel, paddingBottom:120 }} className="fade-in">
-
-              {/* Thumbnail + identity */}
-              <div style={{ display:"flex", gap:14, marginBottom:20, alignItems:"flex-start" }}>
-                {currentScan?.thumb && (
-                  <img src={`data:image/jpeg;base64,${currentScan.thumb}`} alt=""
-                    style={{ width:88, height:88, objectFit:"cover", borderRadius:12, flexShrink:0, border:"2px solid #1a1a2e" }} />
-                )}
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:22, fontWeight:700, color:"#e8e8f0", lineHeight:1.2 }}>
-                    {item.brand || "Unknown"}{item.model ? " " + item.model : ""}
-                  </div>
-                  <div style={{ fontSize:12, color:"#8080a0", marginTop:4 }}>
-                    {[item.subcategory, item.color, item.size_visible].filter(Boolean).join(" · ")}
-                  </div>
-                  <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
-                    <span style={{ padding:"3px 10px", background:"#00ff8715", border:"1px solid #00ff8740", borderRadius:20, fontSize:10, color:"#00ff87" }}>
-                      {item.condition_estimate}
-                    </span>
-                    <span style={{ padding:"3px 10px", background:"#ffffff08", border:"1px solid #2a2a3e", borderRadius:20, fontSize:10, color:"#666" }}>
-                      {item.category}
-                    </span>
-                    <span style={{ padding:"3px 10px", background:"#ffffff08", border:"1px solid #2a2a3e", borderRadius:20, fontSize:10, color:"#666" }}>
-                      {Math.round((item.confidence||0)*100)}% confidence
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Big price */}
-              <div style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:16, padding:20, marginBottom:16, textAlign:"center" }}>
-                <div style={{ fontSize:11, letterSpacing:3, color:"#8080a0", textTransform:"uppercase", marginBottom:6 }}>Weighted Resale Price</div>
-                <div style={{ fontSize:48, fontWeight:700, color:"#e8e8f0", lineHeight:1 }}>€{prices.weightedMedian}</div>
-                <div style={{ fontSize:12, color:"#555", marginTop:8 }}>
-                  Range: €{prices.overallP25} – €{prices.overallMedian} median
-                </div>
-                {prices.enriching && <div style={{ fontSize:10, color:"#ffd600", marginTop:8 }}>⏳ Loading more platforms...</div>}
-                {!prices.enriching && !prices.simulated && <div style={{ fontSize:10, color:"#00ff87", marginTop:8 }}>✓ Live from {Object.keys(prices.platforms).length} platforms</div>}
-                {!prices.enriching && prices.simulated && <div style={{ fontSize:10, color:"#666", marginTop:8 }}>⚡ Estimated — no live data</div>}
-              </div>
-
-              {/* Propensity */}
-              <div style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:16, marginBottom:16 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                  <span style={{ fontSize:10, letterSpacing:2, color:"#8080a0", textTransform:"uppercase" }}>Sell Propensity</span>
-                  <span style={{ fontSize:16, fontWeight:700, color: prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444" }}>
-                    {prices.propensity}%
-                  </span>
-                </div>
-                <div style={{ height:8, background:"#080810", borderRadius:4, overflow:"hidden", marginBottom:8 }}>
-                  <div style={{ height:"100%", borderRadius:4, width:`${prices.propensity}%`, transition:"width 0.8s ease",
-                    background: prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444" }} />
-                </div>
-                <div style={{ fontSize:11, color:"#555" }}>{prices.totalListings} active listings across platforms</div>
-              </div>
-
-              {/* Per-platform breakdown */}
-              <div style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:"4px 0", marginBottom:16 }}>
-                {Object.entries(prices.platforms).map(([p, d]) => (
-                  <div key={p} style={{ display:"flex", alignItems:"center", padding:"10px 16px", borderBottom:"1px solid #080810" }}>
-                    <span style={{ flex:1, fontSize:12, color:"#8080a0" }}>{PLATFORMS[p]?.emoji} {PLATFORMS[p]?.name}</span>
-                    <span style={{ fontSize:15, fontWeight:700, color: PLATFORMS[p]?.color, marginRight:12 }}>€{d.median}</span>
-                    <span style={{ fontSize:10, color:"#444" }}>{d.count} items</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Buy calculator */}
-              <div style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:12, padding:16, marginBottom:20 }}>
-                <div style={{ fontSize:10, letterSpacing:2, color:"#8080a0", textTransform:"uppercase", marginBottom:12 }}>
-                  💶 Seller's asking price
-                </div>
-                <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:10 }}>
-                  <input style={{ flex:1, background:"#080810", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px", color:"#e8e8f0", fontSize:20, fontFamily:"inherit" }}
-                    type="number" placeholder="€ e.g. 15"
-                    value={mktPrice}
-                    onChange={e => setMktPrice(e.target.value)}
-                  />
-                  {signal && (
-                    <div style={{ padding:"10px 14px", borderRadius:10, border:"1px solid", background:signal.color+"18", borderColor:signal.color, color:signal.color, fontSize:13, fontWeight:700, textAlign:"center", flexShrink:0 }}>
-                      {signal.icon}<br/>{signal.label}
-                      {signal.margin > 0 && <div style={{ fontSize:10, fontWeight:400 }}>+{signal.margin}%</div>}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#555" }}>
-                  <span>✅ Buy if &lt; €{prices.buyThreshold}</span>
-                  <span>⚠️ Maybe if &lt; €{prices.maybeThreshold}</span>
-                </div>
-              </div>
-
-              {/* BUY / PASS decision buttons — big, thumb-friendly */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-                <button onClick={() => recordDecision("buy")} style={{
-                  padding:"20px 0", borderRadius:16, border:"2px solid #00ff87",
-                  background:"#00ff8720", color:"#00ff87", fontSize:16, fontWeight:700,
-                  fontFamily:"inherit", cursor:"pointer", letterSpacing:2,
-                }}>
-                  ✅ BUY
-                </button>
-                <button onClick={() => recordDecision("pass")} style={{
-                  padding:"20px 0", borderRadius:16, border:"2px solid #ff4444",
-                  background:"#ff444420", color:"#ff4444", fontSize:16, fontWeight:700,
-                  fontFamily:"inherit", cursor:"pointer", letterSpacing:2,
-                }}>
-                  ❌ PASS
-                </button>
-              </div>
-
-              <button onClick={() => recordDecision(null)} style={{
-                width:"100%", padding:14, borderRadius:12, border:"1px solid #2a2a3e",
-                background:"transparent", color:"#555", fontSize:12, fontFamily:"inherit", cursor:"pointer",
-              }}>
-                📷 Skip & scan next
-              </button>
-
-            </div>
-          </div>
-          )}
-
-
-          {/* ── CLARIFY PANEL ── */}
-          {clarify && (
-            <div style={{ position:"fixed", inset:0, background:"rgba(8,8,16,0.95)", zIndex:200, display:"flex", flexDirection:"column", justifyContent:"flex-end" }} className="fade-in">
-              <div style={{ background:"#0d0d1a", borderTop:"2px solid #00ff87", borderRadius:"20px 20px 0 0", padding:24, paddingBottom:40 }}>
-                <div style={{ fontSize:10, letterSpacing:3, color:"#8080a0", textTransform:"uppercase", marginBottom:6 }}>
-                  Help me identify this
-                </div>
-
-                {clarify.step === "brand" && (<>
-                  <div style={{ fontSize:18, fontWeight:600, color:"#e8e8f0", marginBottom:4 }}>
-                    Which brand is it?
-                  </div>
-                  <div style={{ fontSize:12, color:"#555", marginBottom:20 }}>
-                    Check the label/tag · {clarify.pendingItem.subcategory} · {clarify.pendingItem.color}
-                  </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-                    {["Nike","Adidas","Zara","H&M","Levi's","Ralph Lauren","Mango","Pull&Bear","Stradivarius","Bershka","Tommy Hilfiger","Unknown"].map(b => (
-                      <button key={b} onClick={() => {
-                        const updated = { ...clarify, pendingItem: { ...clarify.pendingItem, brand: b === "Unknown" ? null : b }, step: "condition" };
-                        if (b === "Unknown") {
-                          setClarify(null);
-                          confirmClarify({ brand: null, condition_estimate: clarify.pendingItem.condition_estimate || "good" });
-                        } else {
-                          setClarify(updated);
-                        }
-                      }} style={{
-                        padding:"12px 8px", borderRadius:10, border:"1px solid #2a2a3e",
-                        background:"transparent", color: b === "Unknown" ? "#555" : "#e8e8f0",
-                        fontSize:13, fontFamily:"inherit", cursor:"pointer", textAlign:"center",
-                      }}>{b}</button>
-                    ))}
-                  </div>
-                  <input
-                    style={{ width:"100%", background:"#080810", border:"1px solid #2a2a3e", borderRadius:8, padding:"12px", color:"#e8e8f0", fontSize:14, fontFamily:"inherit", marginBottom:12 }}
-                    placeholder="Type brand name..."
-                    onKeyDown={e => {
-                      if (e.key === "Enter" && e.target.value.trim()) {
-                        const b = e.target.value.trim();
-                        setClarify(c => ({ ...c, pendingItem: { ...c.pendingItem, brand: b }, step: "condition" }));
-                      }
-                    }}
-                  />
-                </>)}
-
-                {clarify.step === "condition" && (<>
-                  <div style={{ fontSize:18, fontWeight:600, color:"#e8e8f0", marginBottom:4 }}>
-                    What's the condition?
-                  </div>
-                  <div style={{ fontSize:12, color:"#555", marginBottom:20 }}>
-                    {clarify.pendingItem.brand || "Unknown brand"} · {clarify.pendingItem.subcategory}
-                  </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-                    {[
-                      { v:"new",       l:"New",      e:"✨" },
-                      { v:"excellent", l:"Excellent", e:"⭐" },
-                      { v:"good",      l:"Good",      e:"👍" },
-                      { v:"fair",      l:"Fair",      e:"😐" },
-                      { v:"poor",      l:"Poor",      e:"🤕" },
-                    ].map(c => (
-                      <button key={c.v} onClick={() => confirmClarify({
-                        brand: clarify.pendingItem.brand,
-                        condition_estimate: c.v,
-                      })} style={{
-                        padding:"16px 8px", borderRadius:10, border:"1px solid #2a2a3e",
-                        background:"transparent", color:"#e8e8f0",
-                        fontSize:12, fontFamily:"inherit", cursor:"pointer",
-                        display:"flex", flexDirection:"column", alignItems:"center", gap:6,
-                      }}>
-                        <span style={{ fontSize:22 }}>{c.e}</span>
-                        {c.l}
-                      </button>
-                    ))}
-                  </div>
-                </>)}
-
-                <button onClick={() => setClarify(null)} style={{
-                  width:"100%", marginTop:18, padding:12, background:"transparent",
-                  border:"1px solid #2a2a3e", borderRadius:10, color:"#555", fontSize:12, fontFamily:"inherit", cursor:"pointer"
-                }}>← Cancel, scan again</button>
-              </div>
-            </div>
-          )}
-
-          {/* ── HISTORY ── */}
-          {screen === "history" && (
-            <div style={S.hpanel} className="fade-in">
-
-              {/* Stats bar */}
-              {dbStats_ && history.length > 0 && (
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8, marginBottom:20 }}>
-                  {[
-                    { label:"Scanned", value: dbStats_.total, color:"#e8e8f0" },
-                    { label:"Bought",  value: dbStats_.bought, color:"#00ff87" },
-                    { label:"Passed",  value: dbStats_.passed, color:"#ff4444" },
-                    { label:"Top cat", value: dbStats_.topCat, color:"#ffd600", small:true },
-                  ].map(s => (
-                    <div key={s.label} style={{ background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
-                      <div style={{ fontSize: s.small ? 9 : 18, fontWeight:700, color: s.color, lineHeight:1.2 }}>{s.value}</div>
-                      <div style={{ fontSize:9, color:"#555", marginTop:3, letterSpacing:1, textTransform:"uppercase" }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={S.h2}>All Scans ({history.length})</div>
-
-              {history.length === 0
-                ? <div style={S.empty}>No scans yet. Point at something at the market! 🧺</div>
-                : history.map(e => {
-                  const decColor = e.decision==="buy" ? "#00ff87" : e.decision==="pass" ? "#ff4444" : "#555";
-                  const decIcon  = e.decision==="buy" ? "✅" : e.decision==="pass" ? "❌" : "—";
-                  return (
-                    <div key={e.id} style={S.hcard}>
-                      <div style={{ position:"relative", flexShrink:0 }}>
-                        <img src={`data:image/jpeg;base64,${e.thumb}`} alt="" style={S.hthumb} />
-                        <div style={{ position:"absolute", top:-4, right:-4, width:20, height:20, borderRadius:"50%",
-                          background: e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#333",
-                          display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>
-                          {e.decision==="buy"?"✓":e.decision==="pass"?"✗":"·"}
-                        </div>
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={S.hbrand}>{e.brand || e.item?.brand || "Unknown"}{e.model ? " "+e.model : ""}</div>
-                        <div style={{ fontSize:11, color:"#8080a0", marginBottom:4 }}>{e.subcategory || e.item?.subcategory}</div>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                          <span style={S.hprice}>€{e.prices?.weightedMedian}</span>
-                          {e.mktPrice && <span style={{ fontSize:11, color:decColor }}>paid €{e.mktPrice} → {decIcon}</span>}
-                          {!e.mktPrice && e.decision && <span style={{ fontSize:11, color:decColor }}>{decIcon} {e.decision}</span>}
-                        </div>
-                        <div style={S.hts}>{e.tsDisplay || new Date(e.ts).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              }
-            </div>
-          )}
-
+    },100);
+  } else {
+    const conditions = [{v:"new",l:"New",e:"✨"},{v:"excellent",l:"Excellent",e:"⭐"},{v:"good",l:"Good",e:"👍"},{v:"fair",l:"Fair",e:"😐"},{v:"poor",l:"Poor",e:"🤕"}];
+    sheet.innerHTML = `
+      <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Almost there</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">What's the condition?</div>
+      <div style="font-size:12px;color:#555;margin-bottom:20px">${item.brand||"Unknown"} · ${item.subcategory||""}</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+        ${conditions.map(c=>`<button onclick="pickCondition('${c.v}')" style="padding:16px 4px;border-radius:10px;border:1px solid #2a2a3e;background:transparent;color:#e8e8f0;font-size:11px;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">${c.e}</span>${c.l}</button>`).join("")}
+      </div>`;
+  }
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function pickBrand(brand) {
+  closeClarify();
+  if (brand==="Unknown") brand = null;
+  clarifyItem = {...clarifyItem, brand};
+  if (brand) {
+    clarifyItem.search_query = [brand, clarifyItem.subcategory, clarifyItem.color].filter(Boolean).join(" ");
+  }
+  showClarify(clarifyItem, clarifyB64); // show condition step
+}
+
+function pickCondition(condition) {
+  closeClarify();
+  clarifyItem = {...clarifyItem, condition_estimate:condition};
+  fetchAndShow(clarifyItem, clarifyB64);
+}
+
+function closeClarify() {
+  const el = document.getElementById("clarify-overlay");
+  if (el) el.remove();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER DETAIL SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderDetail() {
+  const item = currentItem;
+  const prices = currentPrices;
+  if (!item||!prices) return;
+
+  // Thumb
+  const thumb = document.getElementById("detail-thumb");
+  thumb.src = currentB64 ? "data:image/jpeg;base64,"+currentB64 : "";
+
+  // Brand / model / sub
+  document.getElementById("detail-brand").textContent = (item.brand||"Unknown") + (item.model?" "+item.model:"");
+  document.getElementById("detail-sub").textContent = [item.subcategory,item.color,item.size_visible].filter(Boolean).join(" · ");
+
+  // Badges
+  const badges = document.getElementById("detail-badges");
+  badges.innerHTML = [
+    {t:item.condition_estimate,c:"green"},
+    {t:item.category,c:"gray"},
+    {t:Math.round((item.confidence||0)*100)+"%",c:"gray"},
+  ].map(b=>`<span class="badge ${b.c}">${b.t}</span>`).join("");
+
+  updateDetailPrices();
+  document.getElementById("mkt-price").value = "";
+  document.getElementById("signal-box").style.display = "none";
+}
+
+function updateDetailPrices() {
+  const prices = currentPrices;
+  if (!prices) return;
+
+  document.getElementById("detail-price").textContent = "€"+prices.weightedMedian;
+  document.getElementById("detail-range").textContent = `Range: €${prices.overallP25} – €${prices.overallMedian} median`;
+
+  const note = document.getElementById("detail-data-note");
+  if (prices.enriching) {
+    note.style.color="#ffd600"; note.textContent="⏳ Loading more platforms...";
+  } else if (prices.simulated) {
+    note.style.color="#555"; note.textContent="⚡ Estimated prices";
+  } else {
+    note.style.color="#00ff87"; note.textContent=`✓ Live from ${Object.keys(prices.platforms).length} platforms`;
+  }
+
+  // Propensity
+  const propColor = prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444";
+  document.getElementById("prop-pct").textContent = prices.propensity+"%";
+  document.getElementById("prop-pct").style.color = propColor;
+  document.getElementById("prop-bar").style.width  = prices.propensity+"%";
+  document.getElementById("prop-bar").style.background = propColor;
+  document.getElementById("prop-listings").textContent = prices.totalListings+" active listings";
+
+  // Platform list
+  const list = document.getElementById("platforms-list");
+  list.innerHTML = Object.entries(prices.platforms).map(([p,d])=>`
+    <div class="platform-row">
+      <span style="flex:1;font-size:12px;color:#8080a0">${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}</span>
+      <span style="font-size:15px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:12px">€${d.median}</span>
+      <span style="font-size:10px;color:#444">${d.count} items</span>
+    </div>`).join("");
+
+  // Thresholds
+  document.getElementById("thresholds").innerHTML =
+    `<span>✅ Buy if &lt;€${prices.buyThreshold}</span><span>⚠️ Maybe if &lt;€${prices.maybeThreshold}</span>`;
+
+  updateSignal();
+}
+
+function updateSignal() {
+  const mp = parseFloat(document.getElementById("mkt-price").value);
+  const box = document.getElementById("signal-box");
+  if (!currentPrices||isNaN(mp)||mp<=0) { box.style.display="none"; return; }
+  const margin = Math.round((currentPrices.weightedMedian-mp)/mp*100);
+  let label,icon,color;
+  if (mp<=currentPrices.buyThreshold)   { label="BUY";   icon="✅"; color="#00ff87"; }
+  else if (mp<=currentPrices.maybeThreshold) { label="MAYBE"; icon="⚠️"; color="#ffd600"; }
+  else { label="PASS"; icon="❌"; color="#ff4444"; }
+  box.style.display="block";
+  box.style.color=color; box.style.borderColor=color; box.style.background=color+"18";
+  box.innerHTML = icon+"<br>"+label+(margin>0?`<div style="font-size:10px;font-weight:400;margin-top:2px">+${margin}%</div>`:"");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DECISIONS + HISTORY
+// ═══════════════════════════════════════════════════════════════════════════════
+function recordDecision(decision) {
+  if (currentScan) {
+    const mp = parseFloat(document.getElementById("mkt-price").value)||null;
+    currentScan = {...currentScan, decision, mktPrice:mp};
+    dbSave(currentScan).catch(()=>{});
+  }
+  currentItem=null; currentPrices=null; currentScan=null; currentB64=null;
+  showScreen("cam");
+}
+
+async function renderHistory() {
+  let rows = [];
+  try { rows = await dbAll(); } catch(e) {}
+  document.getElementById("scan-count").textContent = rows.length||"";
+
+  // Stats
+  if (rows.length>0) {
+    const bought = rows.filter(r=>r.decision==="buy").length;
+    const passed = rows.filter(r=>r.decision==="pass").length;
+    const cats   = {};
+    rows.forEach(r=>{ cats[r.category]=(cats[r.category]||0)+1; });
+    const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+    const grid   = document.getElementById("stats-grid");
+    grid.style.display="grid";
+    grid.innerHTML = [
+      {v:rows.length, l:"Scanned", c:"#e8e8f0"},
+      {v:bought,      l:"Bought",  c:"#00ff87"},
+      {v:passed,      l:"Passed",  c:"#ff4444"},
+      {v:topCat,      l:"Top",     c:"#ffd600"},
+    ].map(s=>`<div class="stat-box"><div class="stat-val" style="color:${s.c};font-size:${typeof s.v==='string'&&s.v.length>5?10:18}px">${s.v}</div><div class="stat-lbl">${s.l}</div></div>`).join("");
+  }
+
+  const list = document.getElementById("history-list");
+  if (!rows.length) { list.innerHTML='<div class="empty">No scans yet 🧺</div>'; return; }
+
+  list.innerHTML = rows.map(e=>{
+    const decColor = e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#555";
+    const decIcon  = e.decision==="buy"?"✓":e.decision==="pass"?"✗":"·";
+    const decBg    = e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#333";
+    return `<div class="hist-card">
+      <div class="hist-thumb-wrap">
+        <img class="hist-thumb" src="data:image/jpeg;base64,${e.thumb}" alt=""/>
+        <div class="dec-dot" style="background:${decBg};color:#080810">${decIcon}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">${e.brand||"Unknown"}${e.model?" "+e.model:""}</div>
+        <div style="font-size:11px;color:#8080a0;margin-bottom:4px">${e.subcategory||""}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;color:#00ff87">€${e.prices?.weightedMedian||"—"}</span>
+          ${e.mktPrice?`<span style="font-size:11px;color:${decColor}">paid €${e.mktPrice}</span>`:""}
         </div>
-      );
-    }
+        <div style="font-size:10px;color:#555">${e.tsDisplay||""}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREFERENCES UI
+// ═══════════════════════════════════════════════════════════════════════════════
+function savePrefs() {
+  try { localStorage.setItem("tl_prefs", JSON.stringify(prefs)); } catch(e){}
+}
+
+function renderPrefs() {
+  // Interval chips
+  const chips = document.getElementById("interval-chips");
+  chips.innerHTML = [2,3,5,8].map(v=>
+    `<button class="chip ${prefs.interval===v?"active":""}" onclick="setInterval_(${v})">${v}s</button>`
+  ).join("");
+
+  // Auto-scan toggle
+  const tog = document.getElementById("autoscan-toggle");
+  const knob = document.getElementById("toggle-knob");
+  tog.style.background = prefs.autoScan?"#00ff87":"#333";
+  knob.style.transform  = prefs.autoScan?"translateX(22px)":"translateX(0)";
+
+  // Platform grid
+  const grid = document.getElementById("platform-grid");
+  grid.innerHTML = Object.entries(PLATFORMS).map(([k,p])=>{
+    const on = prefs.platforms.includes(k);
+    return `<button class="platform-btn" onclick="togglePlat('${k}')" style="border-color:${on?p.color:"#333"};background:${on?p.color+"22":"transparent"};color:${on?p.color:"#555"}">${p.emoji} ${p.name}</button>`;
+  }).join("");
+}
+
+function setInterval_(v) {
+  prefs.interval = v; savePrefs(); renderPrefs();
+}
+function toggleAutoScan() {
+  prefs.autoScan = !prefs.autoScan; savePrefs(); renderPrefs();
+}
+function togglePlat(k) {
+  if (prefs.platforms.includes(k)) prefs.platforms = prefs.platforms.filter(x=>x!==k);
+  else prefs.platforms.push(k);
+  savePrefs(); renderPrefs();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+renderPrefs();
+startCamera();
+</script>
 </body>
 </html>
