@@ -231,10 +231,13 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONFIG — replace these with your real keys before uploading
+// CONFIG — set your Cloudflare Worker URL after deploying worker.js
+// Keys stay in the Worker (never exposed in browser)
 // ═══════════════════════════════════════════════════════════════════════════════
-const OPENAI_KEY  = "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";
-const APIFY_TOKEN = "apify_api_F7jk6PGL77ogRerVAFHZhNyesxrspK49f7bQ";
+const WORKER_URL  = "https://thriftlens.andrea-amenta87.workers.dev/";
+// Legacy direct keys (only used if no worker set)
+const OPENAI_KEY  = "";
+const APIFY_TOKEN = "";
 
 const PLATFORMS = {
   ebay:      { name:"eBay EU",   color:"#e53238", emoji:"🛒" },
@@ -411,22 +414,37 @@ For watches: include brand + model e.g. "Casio G-Shock DW5600"
 If nothing identifiable: {"error":"no_item"}`;
 
 async function identifyItem(b64) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type":"application/json", "Authorization":"Bearer "+OPENAI_KEY },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      max_tokens: 600,
-      messages:[{
-        role:"user",
-        content:[
-          { type:"text", text: VISION_PROMPT },
-          { type:"image_url", image_url:{ url:"data:image/jpeg;base64,"+b64, detail:"low" }}
-        ]
-      }]
-    })
-  });
-  const data = await res.json();
+  const messages = [{
+    role:"user",
+    content:[
+      { type:"text", text: VISION_PROMPT },
+      { type:"image_url", image_url:{ url:"data:image/jpeg;base64,"+b64, detail:"low" }}
+    ]
+  }];
+
+  let data;
+  if (WORKER_URL && !WORKER_URL.includes("YOUR_WORKER")) {
+    // Use Cloudflare Worker proxy (no CORS issues)
+    const res = await fetch(WORKER_URL+"/vision", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({messages}),
+      signal:AbortSignal.timeout(20000)
+    });
+    data = await res.json();
+  } else if (OPENAI_KEY) {
+    // Direct call (only works on localhost, not GitHub Pages)
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENAI_KEY},
+      body:JSON.stringify({model:"gpt-4o",max_tokens:600,messages}),
+      signal:AbortSignal.timeout(20000)
+    });
+    data = await res.json();
+  } else {
+    throw new Error("No API configured. Set WORKER_URL in the code.");
+  }
+
   if (data.error) throw new Error(data.error.message);
   const text = (data.choices?.[0]?.message?.content||"{}").replace(/```json|```/g,"").trim();
   return JSON.parse(text);
@@ -511,7 +529,9 @@ async function fetchEbay(query) {
 }
 
 async function fetchApify(platform, query) {
-  if (!APIFY_TOKEN||APIFY_TOKEN==="YOUR_APIFY_TOKEN_HERE") return simulatePrices(platform,query);
+  const hasWorker = WORKER_URL && !WORKER_URL.includes("YOUR_WORKER");
+  const hasApify  = APIFY_TOKEN && APIFY_TOKEN !== "YOUR_APIFY_TOKEN_HERE";
+  if (!hasWorker && !hasApify) return simulatePrices(platform,query);
   try {
     const actor = APIFY_ACTORS[platform];
     const inputs = {
@@ -521,10 +541,20 @@ async function fetchApify(platform, query) {
       leboncoin:{searchQuery:query,maxItems:15},
       subito:{search:query,maxItems:15},
     };
-    const res = await fetch(
-      `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`,
-      {method:"POST",headers:{"Content-Type":"application/json"},
-       body:JSON.stringify(inputs[platform]||{query}),signal:AbortSignal.timeout(28000)});
+    let res;
+    if (hasWorker) {
+      res = await fetch(WORKER_URL+"/apify", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({actor, input:inputs[platform]||{query}}),
+        signal:AbortSignal.timeout(28000)
+      });
+    } else {
+      res = await fetch(
+        `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`,
+        {method:"POST",headers:{"Content-Type":"application/json"},
+         body:JSON.stringify(inputs[platform]||{query}),signal:AbortSignal.timeout(28000)});
+    }
     if (!res.ok) return simulatePrices(platform,query);
     const items = await res.json();
     if (!Array.isArray(items)||!items.length) return simulatePrices(platform,query);
