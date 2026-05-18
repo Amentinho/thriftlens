@@ -434,46 +434,47 @@ ONLY JSON. No markdown. No explanation.`;
 
     // ─── APP ─────────────────────────────────────────────────────────────────
     function App() {
+      // ── ALL REFS ─────────────────────────────────────────────────────────────
       const videoRef  = useRef(null);
       const canvasRef = useRef(null);
       const streamRef = useRef(null);
       const timerRef  = useRef(null);
+      const lastScan  = useRef(0);
 
-      const [screen, setScreen]       = useState("cam");     // cam | detail | history | setup
-      // ── API keys hardcoded — users don't need to configure anything ──────────
+      // ── ALL STATE (must come before any useEffect) ───────────────────────────
       const OPENAI_KEY  = "YOUR_OPENAI_KEY_HERE";
       const APIFY_TOKEN = "YOUR_APIFY_TOKEN_HERE";
-      const AI_PROVIDER = "openai";  // "openai" or "anthropic"
+      const AI_PROVIDER = "openai";
 
-      const [cfg, setCfg] = useState(() => {
+      const [screen, setScreen]           = useState("cam");
+      const [cfg, setCfg]                 = useState(() => {
         try {
           const saved = JSON.parse(localStorage.getItem("thriftlens_prefs") || "{}");
           return { interval:3, autoScan:true, ...saved };
         } catch { return { interval:3, autoScan:true }; }
       });
+      const [platforms, setPlatforms]     = useState(Object.keys(PLATFORMS));
+      const [camReady, setCamReady]       = useState(false);
+      const [busy, setBusy]               = useState(false);
+      const [progress, setProgress]       = useState("");
+      const [item, setItem]               = useState(null);
+      const [prices, setPrices]           = useState(null);
+      const [history, setHistory]         = useState([]);
+      const [dbStats_, setDbStats]        = useState(null);
+      const [clarify, setClarify]         = useState(null);
+      const [mktPrice, setMktPrice]       = useState("");
+      const [currentScan, setCurrentScan] = useState(null);
+      const [err, setErr]                 = useState("");
 
+      // ── ALL EFFECTS (after all state) ────────────────────────────────────────
       useEffect(() => {
         try { localStorage.setItem("thriftlens_prefs", JSON.stringify(cfg)); } catch {}
       }, [cfg]);
-      const [platforms, setPlatforms] = useState(Object.keys(PLATFORMS));
-      const [camReady, setCamReady]   = useState(false);
-      const [busy, setBusy]           = useState(false);
-      const [progress, setProgress]   = useState("");
-      const [item, setItem]           = useState(null);
-      const [prices, setPrices]       = useState(null);
-      const [history, setHistory]     = useState([]);
-      const [dbStats_, setDbStats]    = useState(null);
 
-      // Load history from IndexedDB on mount
       useEffect(() => {
         dbLoadAll().then(rows => setHistory(rows)).catch(() => {});
         dbStats().then(setDbStats).catch(() => {});
       }, []);
-      const [clarify, setClarify]     = useState(null);   // null | {type, options, pendingItem, pendingB64}
-      const [mktPrice, setMktPrice]   = useState("");
-      const [currentScan, setCurrentScan] = useState(null);
-      const [err, setErr]             = useState("");
-      const lastScan = useRef(0);
 
       // Camera
       const startCam = useCallback(async () => {
