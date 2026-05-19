@@ -483,86 +483,55 @@ function simulatePrices(platform, query) {
   return {prices,favorites,count,simulated:true};
 }
 
-async function fetchVinted(query) {
+async function fetchPlatform(platform, query) {
   try {
-    const url = `https://www.vinted.es/api/v2/catalog/items?search_text=${encodeURIComponent(query)}&per_page=20`;
-    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-      {signal:AbortSignal.timeout(7000)});
-    const data = await res.json();
-    const parsed = JSON.parse(data.contents||"{}");
-    const items = parsed.items||[];
-    if (!items.length) return simulatePrices("vinted",query);
-    const prices = items.map(i=>parseFloat(i.price||0)).filter(p=>p>0&&p<3000);
-    const favorites = items.map(i=>i.favourite_count||0);
-    if (prices.length<2) return simulatePrices("vinted",query);
-    return {prices,favorites,count:prices.length,simulated:false};
-  } catch(e) { return simulatePrices("vinted",query); }
-}
-
-async function fetchWallapop(query) {
-  try {
-    const url = `https://api.wallapop.com/api/v3/general/search?keywords=${encodeURIComponent(query)}&order_by=most_relevance`;
-    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-      {signal:AbortSignal.timeout(6000)});
-    const data = await res.json();
-    const parsed = JSON.parse(data.contents||"{}");
-    const items = parsed.search_objects||[];
-    if (!items.length) return simulatePrices("wallapop",query);
-    const prices = items.map(i=>parseFloat(i.price||0)).filter(p=>p>0&&p<3000);
-    if (prices.length<2) return simulatePrices("wallapop",query);
-    return {prices,favorites:prices.map(()=>0),count:prices.length,simulated:false};
-  } catch(e) { return simulatePrices("wallapop",query); }
+    const actor = APIFY_ACTORS[platform];
+    if (!actor) return simulatePrices(platform, query);
+    const inputs = {
+      vinted:    {searchText:query, maxItems:20},
+      depop:     {search:query, maxItems:20},
+      wallapop:  {keywords:query, maxItems:20},
+      leboncoin: {searchQuery:query, maxItems:20},
+      subito:    {search:query, maxItems:20},
+    };
+    const res = await fetch(WORKER_URL+"/apify", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({actor, input:inputs[platform]||{query}}),
+      signal:AbortSignal.timeout(30000)
+    });
+    if (!res.ok) return simulatePrices(platform, query);
+    const items = await res.json();
+    if (!Array.isArray(items)||!items.length) return simulatePrices(platform, query);
+    const prices = items
+      .map(i=>parseFloat(String(i.price||i.currentPrice||i.salePrice||0).replace(/[^0-9.]/g,"")))
+      .filter(p=>p>1&&p<5000);
+    if (!prices.length) return simulatePrices(platform, query);
+    const favorites = items.map(i=>i.favouriteCount||i.favourite_count||i.likes||0);
+    return {prices, favorites, count:prices.length, simulated:false};
+  } catch(e) { return simulatePrices(platform, query); }
 }
 
 async function fetchEbay(query) {
+  // Routes through worker: uses eBay official API if EBAY_APP_ID set, else HTML scrape
   try {
-    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_ipg=20`;
-    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-      {signal:AbortSignal.timeout(6000)});
+    const res = await fetch(WORKER_URL+"/ebay", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({query}),
+      signal:AbortSignal.timeout(10000)
+    });
+    if (!res.ok) return simulatePrices("ebay", query);
     const data = await res.json();
-    const html = data.contents||"";
-    const matches = [...html.matchAll(/s-item__price[^>]*>[\s\S]*?EUR\s*([\d,\.]+)/g)];
-    const prices = matches.map(m=>parseFloat(m[1].replace(",","."))).filter(p=>p>1&&p<5000).slice(0,20);
-    if (prices.length<3) return simulatePrices("ebay",query);
-    return {prices,favorites:prices.map(()=>0),count:prices.length,simulated:false};
-  } catch(e) { return simulatePrices("ebay",query); }
+    if (!data.prices||data.prices.length<2) return simulatePrices("ebay", query);
+    return {prices:data.prices, favorites:data.prices.map(()=>0), count:data.prices.length, simulated:false, source:data.source};
+  } catch(e) { return simulatePrices("ebay", query); }
 }
 
-async function fetchApify(platform, query) {
-  const hasWorker = WORKER_URL && !WORKER_URL.includes("YOUR_WORKER");
-  const hasApify  = APIFY_TOKEN && APIFY_TOKEN !== "YOUR_APIFY_TOKEN_HERE";
-  if (!hasWorker && !hasApify) return simulatePrices(platform,query);
-  try {
-    const actor = APIFY_ACTORS[platform];
-    const inputs = {
-      vinted:{searchText:query,maxItems:15},
-      depop:{search:query,maxItems:15},
-      wallapop:{keywords:query,maxItems:15},
-      leboncoin:{searchQuery:query,maxItems:15},
-      subito:{search:query,maxItems:15},
-    };
-    let res;
-    if (hasWorker) {
-      res = await fetch(WORKER_URL+"/apify", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({actor, input:inputs[platform]||{query}}),
-        signal:AbortSignal.timeout(28000)
-      });
-    } else {
-      res = await fetch(
-        `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`,
-        {method:"POST",headers:{"Content-Type":"application/json"},
-         body:JSON.stringify(inputs[platform]||{query}),signal:AbortSignal.timeout(28000)});
-    }
-    if (!res.ok) return simulatePrices(platform,query);
-    const items = await res.json();
-    if (!Array.isArray(items)||!items.length) return simulatePrices(platform,query);
-    const prices = items.map(i=>parseFloat(String(i.price||i.currentPrice||0).replace(/[^0-9.]/g,""))).filter(p=>p>1&&p<5000);
-    if (!prices.length) return simulatePrices(platform,query);
-    return {prices,favorites:items.map(i=>i.favouriteCount||0),count:prices.length,simulated:false};
-  } catch(e) { return simulatePrices(platform,query); }
-}
+async function fetchVinted(query)   { return fetchPlatform("vinted",   query); }
+async function fetchWallapop(query) { return fetchPlatform("wallapop", query); }
+async function fetchApify(platform, query) { return fetchPlatform(platform, query); }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AGGREGATION
@@ -680,14 +649,15 @@ async function fetchAndShow(item, b64) {
   showScreen("detail");
 
   // Phase 2: background enrichment via Apify
-  const slow = ["depop","leboncoin","subito","stockx"].filter(p=>{
+  // Phase 2: ALL platforms via Apify through worker (real data)
+  const slow = ["vinted","wallapop","depop","leboncoin","subito","stockx"].filter(p=>{
     if (!prefs.platforms.includes(p)) return false;
     if (p==="stockx" && !item.is_streetwear_sneaker) return false;
     return true;
   });
 
   Promise.all(slow.map(async p=>{
-    try{ raw[p]=await fetchApify(p,q); } catch(e){ raw[p]=simulatePrices(p,q); }
+    try{ raw[p]=await fetchPlatform(p,q); } catch(e){ raw[p]=simulatePrices(p,q); }
   })).then(()=>{
     const enriched = aggregate(raw, item);
     if (enriched) {
