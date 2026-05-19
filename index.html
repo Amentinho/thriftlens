@@ -418,7 +418,11 @@ async function fetchVinted(query) {
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({query}),
     }, 8000);
-    if (!startRes.ok) { console.warn("Vinted start failed:", startRes.status); return simulatePrices("vinted",query); }
+    if (!startRes.ok) {
+      const errText = await startRes.text().catch(()=>"(no body)");
+      console.warn("Vinted start failed:", startRes.status, errText);
+      return simulatePrices("vinted",query);
+    }
     const {runId, datasetId, cleanQuery} = await startRes.json();
     if (!runId) { console.warn("Vinted: no runId returned"); return simulatePrices("vinted",query); }
     console.log("Vinted: run started", runId, "cleanQuery:", cleanQuery);
