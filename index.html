@@ -190,6 +190,9 @@
       <button class="buy-btn no"  onclick="recordDecision('pass')">❌ PASS</button>
     </div>
     <button class="skip-btn" onclick="recordDecision(null)">📷 Skip &amp; scan next</button>
+    <button onclick="shareWhatsApp()" style="width:100%;margin-top:10px;padding:16px;border-radius:12px;border:2px solid #25D366;background:#25D36622;color:#25D366;font-size:15px;font-family:inherit;cursor:pointer;font-weight:700">
+      📲 Share via WhatsApp
+    </button>
   </div>
 
   <!-- HISTORY SCREEN -->
@@ -501,12 +504,13 @@ async function fetchPlatform(platform, query) {
   try {
     const actor = APIFY_ACTORS[platform];
     if (!actor) return simulatePrices(platform, query);
+    // Input formats verified against each Apify actor's schema
     const inputs = {
-      vinted:    {searchText:query, maxItems:20},
-      depop:     {search:query, maxItems:20},
-      wallapop:  {keywords:query, maxItems:20},
-      leboncoin: {searchQuery:query, maxItems:20},
-      subito:    {search:query, maxItems:20},
+      vinted:    { searchText: query, maxItems: 20, country: "ES" },
+      depop:     { search: query, maxItems: 20 },
+      wallapop:  { keywords: query, country: "ES", maxItems: 20 },
+      leboncoin: { keyword: query, maxResults: 20 },
+      subito:    { query: query, maxItems: 20 },
     };
     const res = await fetch(WORKER_URL+"/apify", {
       method:"POST",
@@ -831,19 +835,23 @@ function updateDetailPrices() {
   document.getElementById("detail-range").textContent = `Range: €${prices.overallP25} – €${prices.overallMedian} median`;
 
   const note = document.getElementById("detail-data-note");
-  const realPlatforms = Object.entries(prices.platforms||{}).filter(([p,d])=>!d.simulated).length;
-  const totalPlatforms = Object.keys(prices.platforms||{}).length;
+  const allPlatEntries = Object.entries(prices.platforms||{});
+  const realPlatforms  = allPlatEntries.filter(([p,d])=>!d.simulated).length;
+  const totalPlatforms = allPlatEntries.length;
   if (prices.enriching) {
-    note.style.color="#ffd600";
+    note.style.color = "#ffd600";
     note.textContent = realPlatforms > 0
-      ? `⏳ ${realPlatforms}/${totalPlatforms} platforms loaded — fetching more...`
-      : "⏳ Fetching real prices...";
+      ? `⏳ ${realPlatforms}/${totalPlatforms} live — loading more...`
+      : "⏳ Fetching real prices from all platforms...";
   } else if (realPlatforms === 0) {
-    note.style.color="#555"; note.textContent="⚡ Estimated prices — live fetch unavailable";
+    note.style.color = "#888";
+    note.textContent = "⚡ Estimated prices (Apify may be slow — try again)";
   } else if (realPlatforms < totalPlatforms) {
-    note.style.color="#ffd600"; note.textContent=`⚡ ${realPlatforms} live + ${totalPlatforms-realPlatforms} estimated`;
+    note.style.color = "#ffd600";
+    note.textContent = `✓ ${realPlatforms} live · ${totalPlatforms-realPlatforms} estimated`;
   } else {
-    note.style.color="#00ff87"; note.textContent=`✓ Live prices from ${realPlatforms} platforms`;
+    note.style.color = "#00ff87";
+    note.textContent = `✓ All ${realPlatforms} platforms live`;
   }
 
   // Propensity
@@ -860,8 +868,8 @@ function updateDetailPrices() {
     <div class="platform-row">
       <span style="flex:1;font-size:12px;color:#8080a0">${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}</span>
       <span style="font-size:15px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:8px">€${d.median}</span>
-      <span style="font-size:10px;color:#444;margin-right:6px">${d.count} items</span>
-      <span style="font-size:9px;color:${d.simulated?"#444":"#00ff87"}">${d.simulated?"est":"live"}</span>
+      <span style="font-size:10px;color:#444;margin-right:4px">${d.count} items</span>
+      <span style="font-size:9px;padding:1px 5px;border-radius:4px;background:${d.simulated?"#2a2a2a":"#00ff8720"};color:${d.simulated?"#555":"#00ff87"}">${d.simulated?"est":"live"}</span>
     </div>`).join("");
 
   // Thresholds
