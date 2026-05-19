@@ -409,6 +409,7 @@ function simulatePrices(platform, query) {
 // ═══════════════════════════════════════════════════════════════════
 async function fetchVinted(query) {
   try {
+    console.log("Vinted: starting fetch for", query);
     const res = await fetchWithTimeout(WORKER_URL+"/apify", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -416,20 +417,25 @@ async function fetchVinted(query) {
         actor:"kazkn~vinted-smart-scraper",
         input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 }
       }),
-    }, 65000);  // 65s timeout
-    if (!res.ok) { console.warn("Vinted HTTP", res.status); return simulatePrices("vinted",query); }
-    const items = await res.json();
-    console.log("Vinted raw count:", items?.length, "first:", JSON.stringify(items?.[0]).slice(0,100));
-    if (!Array.isArray(items)||!items.length) return simulatePrices("vinted",query);
-    // price is a number directly in this actor
+    }, 65000);
+    console.log("Vinted: response status", res.status);
+    if (!res.ok) { console.warn("Vinted HTTP error:", res.status); return simulatePrices("vinted",query); }
+    const text = await res.text();
+    console.log("Vinted: raw text preview:", text.slice(0,200));
+    let items;
+    try { items = JSON.parse(text); } catch(e) { console.warn("Vinted: JSON parse failed:", e.message); return simulatePrices("vinted",query); }
+    if (!Array.isArray(items)||!items.length) { console.warn("Vinted: empty array"); return simulatePrices("vinted",query); }
     const prices = items
       .map(i => typeof i.price === "number" ? i.price : parseFloat(String(i.price||0).replace(/[^0-9.]/g,"")))
-      .filter(p=>p>0.5&&p<5000);
-    if (!prices.length) { console.warn("Vinted: no valid prices. Keys:", Object.keys(items[0]).join(",")); return simulatePrices("vinted",query); }
+      .filter(p => p > 0.5 && p < 5000);
+    console.log("Vinted: parsed", prices.length, "prices:", prices.slice(0,5));
+    if (!prices.length) { console.warn("Vinted: no valid prices, keys:", Object.keys(items[0]||{}).join(",")); return simulatePrices("vinted",query); }
     const favorites = items.map(i=>i.favouriteCount||i.favourite_count||0);
-    console.log("Vinted ✓ live:", prices.length, "prices, sample:", prices.slice(0,5));
-    return {prices,favorites,count:prices.length,simulated:false};
-  } catch(e) { console.warn("Vinted error:", e.message); return simulatePrices("vinted",query); }
+    return {prices, favorites, count:prices.length, simulated:false};
+  } catch(e) {
+    console.warn("Vinted exception:", e.message);
+    return simulatePrices("vinted",query);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -437,17 +443,22 @@ async function fetchVinted(query) {
 // ═══════════════════════════════════════════════════════════════════
 async function fetchEbay(query) {
   try {
+    console.log("eBay: starting fetch for", query);
     const res = await fetchWithTimeout(WORKER_URL+"/ebay", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({query}),
     }, 20000);
-    if (!res.ok) { console.warn("eBay HTTP", res.status); return simulatePrices("ebay",query); }
+    console.log("eBay: response status", res.status);
+    if (!res.ok) { console.warn("eBay HTTP error:", res.status); return simulatePrices("ebay",query); }
     const data = await res.json();
-    console.log("eBay source:", data.source, "count:", data.count);
-    if (!data.prices||data.prices.length<2) { console.warn("eBay: no prices"); return simulatePrices("ebay",query); }
-    return {prices:data.prices,favorites:data.prices.map(()=>0),count:data.prices.length,simulated:false,source:data.source};
-  } catch(e) { console.warn("eBay error:", e.message); return simulatePrices("ebay",query); }
+    console.log("eBay: source="+data.source+" count="+data.count+" prices="+JSON.stringify(data.prices?.slice(0,5)));
+    if (!data.prices||data.prices.length<2) { console.warn("eBay: not enough prices"); return simulatePrices("ebay",query); }
+    return {prices:data.prices, favorites:data.prices.map(()=>0), count:data.prices.length, simulated:false};
+  } catch(e) {
+    console.warn("eBay exception:", e.message);
+    return simulatePrices("ebay",query);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -534,8 +545,10 @@ function setScanLine(on) { document.getElementById("scan-line").style.display=on
 // Timeout helper — works on all Safari versions
 function fetchWithTimeout(url, opts, ms) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout after "+ms+"ms")), ms);
-    fetch(url, opts).then(r => { clearTimeout(timer); resolve(r); }).catch(e => { clearTimeout(timer); reject(e); });
+    const timer = setTimeout(() => reject(new Error("timeout_"+ms)), ms);
+    fetch(url, opts)
+      .then(r => { clearTimeout(timer); resolve(r); })
+      .catch(e => { clearTimeout(timer); reject(e); });
   });
 }
 
