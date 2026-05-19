@@ -415,7 +415,7 @@ async function fetchVinted(query) {
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         actor:"kazkn~vinted-smart-scraper",
-        input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 }
+        input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"] }
       }),
     }, 65000);
     console.log("Vinted: response status", res.status);
@@ -426,26 +426,6 @@ async function fetchVinted(query) {
     try { items = JSON.parse(text); } catch(e) { console.warn("Vinted: JSON parse failed:", e.message); return simulatePrices("vinted",query); }
     if (!Array.isArray(items)||!items.length) {
       console.warn("Vinted: empty array for query:", query);
-      // Retry with first 2 words only (broader search)
-      const shortQuery = query.split(" ").slice(0,2).join(" ");
-      if (shortQuery !== query && shortQuery.length > 3) {
-        console.log("Vinted: retrying with shorter query:", shortQuery);
-        try {
-          const res2 = await fetchWithTimeout(WORKER_URL+"/apify", {
-            method:"POST", headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({ actor:"kazkn~vinted-smart-scraper",
-              input:{ mode:"SEARCH", query:shortQuery, countries:["es","fr","de","it","nl","pt"], maxItems:20 }})
-          }, 40000);
-          const items2 = JSON.parse(await res2.text());
-          if (Array.isArray(items2)&&items2.length) {
-            const prices2 = items2.map(i=>typeof i.price==="number"?i.price:parseFloat(String(i.price||0).replace(/[^0-9.]/g,""))).filter(p=>p>0.5&&p<5000);
-            if (prices2.length) {
-              console.log("Vinted retry ✓:", prices2.length, "prices");
-              return {prices:prices2, favorites:items2.map(i=>i.favouriteCount||0), count:prices2.length, simulated:false};
-            }
-          }
-        } catch(e) { console.warn("Vinted retry failed:", e.message); }
-      }
       return simulatePrices("vinted",query);
     }
     const prices = items
