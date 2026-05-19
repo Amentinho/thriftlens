@@ -583,7 +583,7 @@ function aggregate(platformData, item) {
     buyThreshold:Math.round(wm*.45*100)/100,
     maybeThreshold:Math.round(wm*.60*100)/100,
     simulated:Object.values(results).some(r=>r.simulated),
-    enriching:false
+    enriching:false  // caller overrides this
   };
 }
 
@@ -679,61 +679,46 @@ async function fetchAndShow(item, b64) {
     showScreen("detail");
   }
 
-  // ── Phase 1: Fast real sources in parallel (eBay scrape ~3-5s)
-  const fast = {};
-  if (prefs.platforms.includes("ebay"))     fast.ebay     = fetchEbay(q);
-
-  await Promise.all(Object.entries(fast).map(async([p,t])=>{
-    try{ raw[p]=await t; } catch(e){ raw[p]=simulatePrices(p,q); }
-  }));
-
-  // Merge fast real data over simulation
+  // ── Phase 1 + 2: Fire ALL real sources simultaneously, update UI as each arrives
+  // Start all platform fetches at once
+  const platformFetches = {};
   for (const p of prefs.platforms) {
-    if (!raw[p]) raw[p] = simRaw[p];
+    if (p === "stockx" && !item.is_streetwear_sneaker) continue;
+    if (p === "ebay") platformFetches[p] = fetchEbay(q);
+    else platformFetches[p] = fetchPlatform(p, q);
   }
 
-  const fastAgg = aggregate(raw, item);
-  if (!fastAgg) { return; }
+  let realCount = 0;
+  const total = Object.keys(platformFetches).length;
 
-  // Update with first real data (may already be on detail screen from Phase 0)
-  currentItem   = item;
-  currentPrices = { ...fastAgg, enriching: true };
-  currentB64    = b64;
-  if (!currentScan) {
-    currentScan = {
-      id:Date.now(), ts:new Date().toISOString(), tsDisplay:new Date().toLocaleTimeString(),
-      brand:item.brand||"Unknown", model:item.model||"",
-      category:item.category||"other", subcategory:item.subcategory||"",
-      color:item.color||"", condition:item.condition_estimate||"good",
-      search_query:q, prices:fastAgg, thumb:b64, decision:null, mktPrice:null
-    };
-  } else {
-    currentScan.prices = fastAgg;
-  }
-
-  dbSave(currentScan).catch(()=>{});
-  updateDetailPrices();
-  if (document.getElementById("detail-screen").style.display === "none" ||
-      !document.getElementById("detail-screen").classList.contains("visible")) {
-    renderDetail();
-    showScreen("detail");
-  }
-
-  // Phase 2: background enrichment via Apify
-  // Phase 2: ALL platforms via Apify through worker (real data)
-  const slow = ["vinted","wallapop","depop","leboncoin","subito","stockx"].filter(p=>{
-    if (!prefs.platforms.includes(p)) return false;
-    if (p==="stockx" && !item.is_streetwear_sneaker) return false;
-    return true;
+  // Update UI progressively as each platform resolves
+  const promises = Object.entries(platformFetches).map(async ([p, promise]) => {
+    try {
+      const result = await promise;
+      raw[p] = result;
+      if (!result.simulated) realCount++;
+    } catch(e) {
+      raw[p] = simRaw[p]; // keep simulation for failed platforms
+    }
+    // Update prices after each platform resolves
+    const agg = aggregate(raw, item);
+    if (agg) {
+      const stillLoading = realCount < total;
+      currentPrices = { ...agg, enriching: stillLoading };
+      if (currentScan) currentScan.prices = agg;
+      updateDetailPrices();
+    }
   });
 
-  Promise.all(slow.map(async p=>{
-    try{ raw[p]=await fetchPlatform(p,q); } catch(e){ raw[p]=simulatePrices(p,q); }
-  })).then(()=>{
-    const enriched = aggregate(raw, item);
-    if (enriched) {
-      currentPrices = {...enriched, enriching:false};
-      if (currentScan) { currentScan.prices = enriched; dbSave(currentScan).catch(()=>{}); }
+  // Save to DB once all done
+  Promise.all(promises).then(() => {
+    const finalAgg = aggregate(raw, item);
+    if (finalAgg) {
+      currentPrices = { ...finalAgg, enriching: false };
+      if (currentScan) {
+        currentScan.prices = finalAgg;
+        dbSave(currentScan).catch(()=>{});
+      }
       updateDetailPrices();
     }
   });
@@ -846,12 +831,19 @@ function updateDetailPrices() {
   document.getElementById("detail-range").textContent = `Range: €${prices.overallP25} – €${prices.overallMedian} median`;
 
   const note = document.getElementById("detail-data-note");
+  const realPlatforms = Object.entries(prices.platforms||{}).filter(([p,d])=>!d.simulated).length;
+  const totalPlatforms = Object.keys(prices.platforms||{}).length;
   if (prices.enriching) {
-    note.style.color="#ffd600"; note.textContent="⏳ Loading more platforms...";
-  } else if (prices.simulated) {
-    note.style.color="#555"; note.textContent="⚡ Estimated prices";
+    note.style.color="#ffd600";
+    note.textContent = realPlatforms > 0
+      ? `⏳ ${realPlatforms}/${totalPlatforms} platforms loaded — fetching more...`
+      : "⏳ Fetching real prices...";
+  } else if (realPlatforms === 0) {
+    note.style.color="#555"; note.textContent="⚡ Estimated prices — live fetch unavailable";
+  } else if (realPlatforms < totalPlatforms) {
+    note.style.color="#ffd600"; note.textContent=`⚡ ${realPlatforms} live + ${totalPlatforms-realPlatforms} estimated`;
   } else {
-    note.style.color="#00ff87"; note.textContent=`✓ Live from ${Object.keys(prices.platforms).length} platforms`;
+    note.style.color="#00ff87"; note.textContent=`✓ Live prices from ${realPlatforms} platforms`;
   }
 
   // Propensity
@@ -867,8 +859,9 @@ function updateDetailPrices() {
   list.innerHTML = Object.entries(prices.platforms).map(([p,d])=>`
     <div class="platform-row">
       <span style="flex:1;font-size:12px;color:#8080a0">${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}</span>
-      <span style="font-size:15px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:12px">€${d.median}</span>
-      <span style="font-size:10px;color:#444">${d.count} items</span>
+      <span style="font-size:15px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:8px">€${d.median}</span>
+      <span style="font-size:10px;color:#444;margin-right:6px">${d.count} items</span>
+      <span style="font-size:9px;color:${d.simulated?"#444":"#00ff87"}">${d.simulated?"est":"live"}</span>
     </div>`).join("");
 
   // Thresholds
