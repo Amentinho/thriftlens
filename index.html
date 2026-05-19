@@ -427,15 +427,15 @@ async function fetchVinted(query) {
     if (!runId) { console.warn("Vinted: no runId returned"); return simulatePrices("vinted",query); }
     console.log("Vinted: run started", runId, "cleanQuery:", cleanQuery);
 
-    // Step 2: Poll status (public Apify endpoint — no token needed)
-    const deadline = Date.now() + 55000;
+    // Step 2: Poll status via worker (token stays in worker)
+    const deadline = Date.now() + 90000;  // 90s max wait
     let status = "RUNNING";
     while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 4000));
       try {
-        const statusRes = await fetchWithTimeout(`https://api.apify.com/v2/actor-runs/${runId}`, {}, 5000);
+        const statusRes = await fetchWithTimeout(WORKER_URL+"/vinted/status?runId="+runId, {}, 6000);
         const statusData = await statusRes.json();
-        status = statusData?.data?.status || "RUNNING";
+        status = statusData?.status || "RUNNING";
         console.log("Vinted status:", status);
         if (status === "SUCCEEDED" || status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") break;
       } catch(e) { console.warn("Vinted poll error:", e.message); }
@@ -443,8 +443,8 @@ async function fetchVinted(query) {
 
     if (status !== "SUCCEEDED") { console.warn("Vinted run ended:", status); return simulatePrices("vinted",query); }
 
-    // Step 3: Fetch dataset (public Apify endpoint — no token needed)
-    const dataRes = await fetchWithTimeout(`https://api.apify.com/v2/datasets/${datasetId}/items?limit=10`, {}, 8000);
+    // Step 3: Fetch dataset via worker (token stays in worker)
+    const dataRes = await fetchWithTimeout(WORKER_URL+"/vinted/results?datasetId="+datasetId, {}, 10000);
     const items = await dataRes.json();
     console.log("Vinted: got", items.length, "items");
     if (!Array.isArray(items)||!items.length) return simulatePrices("vinted",query);
