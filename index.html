@@ -118,6 +118,7 @@
       </div>
       <div id="cam-status">Starting camera...</div>
       <button id="manual-btn" onclick="doScan()">📸</button>
+      <button id="barcode-btn" onclick="startBarcodeMode()" style="position:absolute;bottom:10px;left:12px;width:54px;height:54px;border-radius:50%;background:#ffd600;border:none;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Scan barcode/ISBN">📦</button>
     </div>
     <div id="cam-err"></div>
   </div>
@@ -318,6 +319,7 @@ async function startCamera() {
 
 function stopCamera() {
   clearInterval(scanTimer);
+  stopBarcodeMode();
   if (stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
 }
 
@@ -694,10 +696,11 @@ function renderDetail() {
   thumb.src=currentB64?"data:image/jpeg;base64,"+currentB64:"";
   document.getElementById("detail-brand").textContent=(item.brand||"Unknown")+(item.model?" "+item.model:"");
   document.getElementById("detail-sub").textContent=[item.subcategory,item.color,item.size_visible].filter(Boolean).join(" · ");
+  const sourceBadge = item.isbn ? `ISBN ${item.isbn.slice(-4)}` : item.barcode ? `EAN` : Math.round((item.confidence||0)*100)+"%";
   document.getElementById("detail-badges").innerHTML=[
     {t:item.condition_estimate,c:"green"},
     {t:item.category,c:"gray"},
-    {t:Math.round((item.confidence||0)*100)+"%",c:"gray"},
+    {t:sourceBadge,c:item.isbn||item.barcode?"green":"gray"},
   ].map(b=>`<span class="badge ${b.c}">${b.t}</span>`).join("");
   document.getElementById("mkt-price").value="";
   document.getElementById("signal-box").style.display="none";
@@ -841,6 +844,127 @@ function renderPrefs(){
 }
 function setIntervalPref(v){prefs.interval=v;savePrefs();renderPrefs();}
 function toggleAutoScan(){prefs.autoScan=!prefs.autoScan;savePrefs();renderPrefs();}
+
+// ═══════════════════════════════════════════════════════════════════
+// BARCODE / ISBN SCANNING
+// ═══════════════════════════════════════════════════════════════════
+let barcodeDetector = null;
+let barcodeInterval = null;
+let barcodeMode = false;
+
+async function startBarcodeMode() {
+  if (!("BarcodeDetector" in window)) {
+    setErr("Barcode scanning not supported. Use Safari on iOS 16+ or Chrome.");
+    return;
+  }
+  if (barcodeMode) { stopBarcodeMode(); return; }
+  barcodeMode = true;
+  barcodeDetector = new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","qr_code","code_128"]});
+  document.getElementById("barcode-btn").style.background = "#ff4444";
+  document.getElementById("barcode-btn").textContent = "⏹";
+  setStatus("📦 Point at barcode/ISBN — hold steady");
+  barcodeInterval = setInterval(async () => {
+    const video = document.getElementById("video");
+    if (!video || video.readyState < 2) return;
+    try {
+      const codes = await barcodeDetector.detect(video);
+      if (codes && codes.length > 0) {
+        const code = codes[0].rawValue;
+        console.log("Barcode detected:", code, codes[0].format);
+        stopBarcodeMode();
+        await lookupBarcode(code);
+      }
+    } catch(e) {}
+  }, 500);
+}
+
+function stopBarcodeMode() {
+  barcodeMode = false;
+  clearInterval(barcodeInterval);
+  const btn = document.getElementById("barcode-btn");
+  if (btn) { btn.style.background = "#ffd600"; btn.textContent = "📦"; }
+}
+
+async function lookupBarcode(code) {
+  setStatus("🔍 Looking up " + code + "...");
+  clearInterval(scanTimer);
+  let item = null;
+
+  // Open Library (books/ISBN)
+  try {
+    const res = await fetchWithTimeout("https://openlibrary.org/api/books?bibkeys=ISBN:"+code+"&format=json&jscmd=data", {}, 8000);
+    const data = await res.json();
+    const book = data["ISBN:"+code];
+    if (book) {
+      const title   = book.title || "";
+      const authors = (book.authors||[]).map(a=>a.name).join(", ");
+      item = {
+        brand: authors||null, model: title, category:"book", subcategory:"book",
+        color:"multicolor", condition_estimate:"good", size_visible:null, gender:"na",
+        search_query: title.split(" ").slice(0,4).join(" ")+" libro",
+        confidence:0.98, is_luxury:false, is_streetwear_sneaker:false, is_camera_watch_collectible:false,
+        isbn:code, year:book.publish_date||"", source:"openlibrary"
+      };
+      console.log("Open Library:", title, authors);
+    }
+  } catch(e) { console.warn("Open Library:", e.message); }
+
+  // Google Books fallback
+  if (!item) {
+    try {
+      const res = await fetchWithTimeout("https://www.googleapis.com/books/v1/volumes?q=isbn:"+code, {}, 8000);
+      const data = await res.json();
+      const vol = data.items?.[0]?.volumeInfo;
+      if (vol) {
+        const title   = vol.title || "";
+        const authors = (vol.authors||[]).join(", ");
+        item = {
+          brand: authors||null, model: title, category:"book", subcategory:"book",
+          color:"multicolor", condition_estimate:"good", size_visible:null, gender:"na",
+          search_query: title.split(" ").slice(0,4).join(" ")+" libro",
+          confidence:0.97, is_luxury:false, is_streetwear_sneaker:false, is_camera_watch_collectible:false,
+          isbn:code, source:"google_books"
+        };
+        console.log("Google Books:", title, authors);
+      }
+    } catch(e) { console.warn("Google Books:", e.message); }
+  }
+
+  // Discogs (vinyl barcodes)
+  if (!item) {
+    try {
+      const res = await fetchWithTimeout(
+        "https://api.discogs.com/database/search?barcode="+code+"&type=release&per_page=3",
+        {headers:{"User-Agent":"ThriftLens/1.0"}}, 8000
+      );
+      const data = await res.json();
+      const release = data.results?.[0];
+      if (release) {
+        const title = release.title || "";
+        item = {
+          brand: title.split(" - ")[0]||null, model: title.split(" - ")[1]||title,
+          category:"vinyl", subcategory:"vinyl record", color:"black",
+          condition_estimate:"good", size_visible:null, gender:"na",
+          search_query: (title+" vinyl").slice(0,40),
+          confidence:0.96, is_luxury:false, is_streetwear_sneaker:false, is_camera_watch_collectible:false,
+          barcode:code, year:release.year||"", source:"discogs"
+        };
+        console.log("Discogs:", title);
+      }
+    } catch(e) { console.warn("Discogs:", e.message); }
+  }
+
+  if (!item) {
+    setErr("Barcode "+code+" not found. Try camera scan 📸");
+    setStatus(prefs.autoScan ? "⚡ Auto-scanning every "+prefs.interval+"s" : "Tap 📸 to scan");
+    if (prefs.autoScan) scanTimer = setInterval(doScan, prefs.interval*1000);
+    return;
+  }
+
+  setStatus("✓ "+(item.model||item.brand||"Found")+" — fetching prices...");
+  const b64 = captureFrame() || "";
+  await fetchAndShow(item, b64);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
