@@ -408,33 +408,51 @@ function simulatePrices(platform, query) {
 // VINTED — via worker (run-sync, working pattern from before)
 // ═══════════════════════════════════════════════════════════════════
 async function fetchVinted(query) {
+  // Step 1: Ask worker to start Apify run (instant, <1s, token stays in worker)
+  // Step 2: Poll Apify run status directly from browser (public endpoint, no token)
+  // Step 3: Fetch dataset directly from browser (public endpoint, no token)
   try {
-    console.log("Vinted: starting fetch for", query);
-    const res = await fetchWithTimeout(WORKER_URL+"/apify", {
+    console.log("Vinted: starting run for", query);
+    const startRes = await fetchWithTimeout(WORKER_URL+"/vinted/start", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        actor:"kazkn~vinted-smart-scraper",
-        input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"] }
-      }),
-    }, 65000);
-    console.log("Vinted: response status", res.status);
-    if (!res.ok) { console.warn("Vinted HTTP error:", res.status); return simulatePrices("vinted",query); }
-    const text = await res.text();
-    console.log("Vinted: raw text preview:", text.slice(0,200));
-    let items;
-    try { items = JSON.parse(text); } catch(e) { console.warn("Vinted: JSON parse failed:", e.message); return simulatePrices("vinted",query); }
-    if (!Array.isArray(items)||!items.length) {
-      console.warn("Vinted: empty array for query:", query);
-      return simulatePrices("vinted",query);
+      body:JSON.stringify({query}),
+    }, 8000);
+    if (!startRes.ok) { console.warn("Vinted start failed:", startRes.status); return simulatePrices("vinted",query); }
+    const {runId, datasetId, cleanQuery} = await startRes.json();
+    if (!runId) { console.warn("Vinted: no runId returned"); return simulatePrices("vinted",query); }
+    console.log("Vinted: run started", runId, "cleanQuery:", cleanQuery);
+
+    // Step 2: Poll status (public Apify endpoint — no token needed)
+    const deadline = Date.now() + 55000;
+    let status = "RUNNING";
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const statusRes = await fetchWithTimeout(`https://api.apify.com/v2/actor-runs/${runId}`, {}, 5000);
+        const statusData = await statusRes.json();
+        status = statusData?.data?.status || "RUNNING";
+        console.log("Vinted status:", status);
+        if (status === "SUCCEEDED" || status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") break;
+      } catch(e) { console.warn("Vinted poll error:", e.message); }
     }
+
+    if (status !== "SUCCEEDED") { console.warn("Vinted run ended:", status); return simulatePrices("vinted",query); }
+
+    // Step 3: Fetch dataset (public Apify endpoint — no token needed)
+    const dataRes = await fetchWithTimeout(`https://api.apify.com/v2/datasets/${datasetId}/items?limit=10`, {}, 8000);
+    const items = await dataRes.json();
+    console.log("Vinted: got", items.length, "items");
+    if (!Array.isArray(items)||!items.length) return simulatePrices("vinted",query);
+
     const prices = items
-      .map(i => typeof i.price === "number" ? i.price : parseFloat(String(i.price||0).replace(/[^0-9.]/g,"")))
+      .map(i => typeof i.price==="number" ? i.price : parseFloat(String(i.price||0).replace(/[^0-9.]/g,"")))
       .filter(p => p > 0.5 && p < 5000);
-    console.log("Vinted: parsed", prices.length, "prices:", prices.slice(0,5));
-    if (!prices.length) { console.warn("Vinted: no valid prices, keys:", Object.keys(items[0]||{}).join(",")); return simulatePrices("vinted",query); }
+    if (!prices.length) { console.warn("Vinted: no prices. Keys:", Object.keys(items[0]||{}).join(",")); return simulatePrices("vinted",query); }
     const favorites = items.map(i=>i.favouriteCount||i.favourite_count||0);
+    console.log("Vinted ✓ LIVE:", prices.length, "prices:", prices.slice(0,5));
     return {prices, favorites, count:prices.length, simulated:false};
+
   } catch(e) {
     console.warn("Vinted exception:", e.message);
     return simulatePrices("vinted",query);
