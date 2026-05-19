@@ -416,19 +416,21 @@ async function fetchVinted(query) {
         actor:"kazkn~vinted-smart-scraper",
         input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 }
       }),
-      signal:AbortSignal.timeout(35000)
+      signal:AbortSignal.timeout(60000)  // 60s — actor needs ~10-30s on cold start
     });
-    if (!res.ok) return simulatePrices("vinted",query);
+    if (!res.ok) { console.warn("Vinted HTTP", res.status); return simulatePrices("vinted",query); }
     const items = await res.json();
+    console.log("Vinted raw count:", items?.length, "first:", JSON.stringify(items?.[0]).slice(0,100));
     if (!Array.isArray(items)||!items.length) return simulatePrices("vinted",query);
-    const flat = items[0]?.items ? items.flatMap(r=>r.items||[]) : items;
-    const prices = flat
-      .map(i=>parseFloat(String(i.price||i.priceNumeric||0).replace(/[^0-9.]/g,"")))
+    // price is a number directly in this actor
+    const prices = items
+      .map(i => typeof i.price === "number" ? i.price : parseFloat(String(i.price||0).replace(/[^0-9.]/g,"")))
       .filter(p=>p>0.5&&p<5000);
-    if (!prices.length) return simulatePrices("vinted",query);
-    const favorites = flat.map(i=>i.favouriteCount||i.favourite_count||0);
+    if (!prices.length) { console.warn("Vinted: no valid prices. Keys:", Object.keys(items[0]).join(",")); return simulatePrices("vinted",query); }
+    const favorites = items.map(i=>i.favouriteCount||i.favourite_count||0);
+    console.log("Vinted ✓ live:", prices.length, "prices, sample:", prices.slice(0,5));
     return {prices,favorites,count:prices.length,simulated:false};
-  } catch(e) { return simulatePrices("vinted",query); }
+  } catch(e) { console.warn("Vinted error:", e.message); return simulatePrices("vinted",query); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -440,13 +442,14 @@ async function fetchEbay(query) {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({query}),
-      signal:AbortSignal.timeout(12000)
+      signal:AbortSignal.timeout(20000)
     });
-    if (!res.ok) return simulatePrices("ebay",query);
+    if (!res.ok) { console.warn("eBay HTTP", res.status); return simulatePrices("ebay",query); }
     const data = await res.json();
-    if (!data.prices||data.prices.length<2) return simulatePrices("ebay",query);
+    console.log("eBay source:", data.source, "count:", data.count);
+    if (!data.prices||data.prices.length<2) { console.warn("eBay: no prices"); return simulatePrices("ebay",query); }
     return {prices:data.prices,favorites:data.prices.map(()=>0),count:data.prices.length,simulated:false,source:data.source};
-  } catch(e) { return simulatePrices("ebay",query); }
+  } catch(e) { console.warn("eBay error:", e.message); return simulatePrices("ebay",query); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
