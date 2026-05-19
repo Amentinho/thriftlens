@@ -238,9 +238,7 @@
 // Keys stay in the Worker (never exposed in browser)
 // ═══════════════════════════════════════════════════════════════════════════════
 const WORKER_URL  = "https://thriftlens.andrea-amenta87.workers.dev";
-// Legacy direct keys (only used if no worker set)
-const OPENAI_KEY  = "";
-const APIFY_TOKEN = "";
+// All API keys are stored securely in the Cloudflare Worker — none exposed here
 
 const PLATFORMS = {
   ebay:      { name:"eBay EU",   color:"#e53238", emoji:"🛒" },
@@ -501,48 +499,85 @@ function simulatePrices(platform, query) {
 }
 
 async function fetchPlatform(platform, query) {
+  const actor = APIFY_ACTORS[platform];
+  if (!actor || !WORKER_URL || WORKER_URL.includes("YOUR_WORKER")) {
+    return simulatePrices(platform, query);
+  }
+
+  const inputs = {
+    vinted:    { mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 },
+    depop:     { search:query, maxItems:20 },
+    wallapop:  { keywords:query, maxItems:20 },
+    leboncoin: { startUrls:[{url:`https://www.leboncoin.fr/recherche?text=${encodeURIComponent(query)}`}], maxItems:20 },
+    subito:    { startUrls:[{url:`https://www.subito.it/annunci-italia/vendita/usato/?q=${encodeURIComponent(query)}`}], maxItems:20 },
+  };
+
   try {
-    const actor = APIFY_ACTORS[platform];
-    if (!actor) return simulatePrices(platform, query);
-
-    const inputs = {
-      vinted:    { mode: "SEARCH", query: query, countries: ["es","fr","de","it","nl","pt"], maxItems: 20 },
-      depop:     { search: query, maxItems: 20, startPage: 1 },
-      wallapop:  { keywords: query, maxItems: 20 },
-      leboncoin: { startUrls: [{ url: `https://www.leboncoin.fr/recherche?text=${encodeURIComponent(query)}` }], maxItems: 20 },
-      subito:    { startUrls: [{ url: `https://www.subito.it/annunci-italia/vendita/usato/?q=${encodeURIComponent(query)}` }], maxItems: 20 },
-    };
-
-    const timeout = platform === "vinted" ? 50000 : 35000;
-    const res = await fetch(WORKER_URL+"/apify", {
+    // Step 1: start run via worker (token stays in worker, returns runId)
+    const startRes = await fetch(WORKER_URL + "/apify/start", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({actor, input: inputs[platform]||{query}}),
-      signal: AbortSignal.timeout(timeout)
+      body: JSON.stringify({ actor, input: inputs[platform] || {query} }),
+      signal: AbortSignal.timeout(10000)
     });
 
-    if (!res.ok) { console.warn(platform+" HTTP "+res.status); return simulatePrices(platform, query); }
+    if (!startRes.ok) { console.warn(platform+" start HTTP "+startRes.status); return simulatePrices(platform,query); }
 
-    const raw = await res.json();
-    console.log(platform+" raw:", JSON.stringify(raw).slice(0,300));
+    const { runId, datasetId } = await startRes.json();
+    if (!runId) { console.warn(platform+": no runId"); return simulatePrices(platform,query); }
+    console.log(platform+" started runId:", runId);
 
-    // Normalise: vinted-smart-scraper may return [{items:[...]}, ...]
-    const items = Array.isArray(raw)
-      ? (raw[0]?.items ? raw.flatMap(r => r.items||[]) : raw)
-      : [];
+    // Step 2: poll status via worker (token stays in worker)
+    const deadline = Date.now() + 50000;
+    let status = "RUNNING";
 
-    if (!items.length) { console.warn(platform+": empty"); return simulatePrices(platform, query); }
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      const statusRes = await fetch(WORKER_URL + "/apify/status", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ runId }),
+        signal: AbortSignal.timeout(5000)
+      });
+      const statusData = await statusRes.json();
+      status = statusData.status || "RUNNING";
+      console.log(platform+" status:", status);
+      if (status === "SUCCEEDED" || status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") break;
+    }
 
-    const prices = items
+    if (status !== "SUCCEEDED") { console.warn(platform+" ended with:", status); return simulatePrices(platform,query); }
+
+    // Step 3: fetch results via worker (token stays in worker)
+    const resultsRes = await fetch(WORKER_URL + "/apify/results", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ datasetId }),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const items = await resultsRes.json();
+    console.log(platform+" items:", items.length, "sample:", JSON.stringify(items[0]||{}).slice(0,150));
+
+    if (!Array.isArray(items) || !items.length) return simulatePrices(platform,query);
+
+    const flat = items[0]?.items ? items.flatMap(r => r.items||[]) : items;
+    const prices = flat
       .map(i => parseFloat(String(i.price||i.priceNumeric||i.currentPrice||i.salePrice||0).replace(/[^0-9.]/g,"")))
       .filter(p => p > 0.5 && p < 5000);
 
-    if (!prices.length) { console.warn(platform+": no prices. Sample:", JSON.stringify(items[0]).slice(0,200)); return simulatePrices(platform, query); }
+    if (!prices.length) {
+      console.warn(platform+": no prices. Keys:", Object.keys(flat[0]||{}).join(","));
+      return simulatePrices(platform,query);
+    }
 
-    const favorites = items.map(i => i.favouriteCount||i.favourite_count||i.likes||0);
-    return {prices, favorites, count: prices.length, simulated: false};
+    const favorites = flat.map(i => i.favouriteCount||i.favourite_count||i.likes||0);
+    console.log(platform+" ✓", prices.length,"live prices:", prices.slice(0,5));
+    return { prices, favorites, count:prices.length, simulated:false };
 
-  } catch(e) { console.warn(platform+" error:", e.message); return simulatePrices(platform, query); }
+  } catch(e) {
+    console.warn(platform+" error:", e.message);
+    return simulatePrices(platform, query);
+  }
 }
 
 
