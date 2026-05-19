@@ -399,26 +399,33 @@ function setErr(msg) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // VISION
 // ═══════════════════════════════════════════════════════════════════════════════
-const VISION_PROMPT = `You are a secondhand resale expert. Identify the item in the image for pricing.
-Return ONLY valid JSON, no markdown:
+const VISION_PROMPT = `You are a secondhand resale pricing expert for flea markets and thrift stores.
+Your job is to identify ANY object that could be resold: clothing, shoes, bags, cameras, watches, books, vinyl records, antiques, electronics, toys, accessories, jewelry, art, furniture, or any other physical item.
+
+Return ONLY valid JSON, no markdown, no explanation:
 {
-  "brand": "exact brand or null",
-  "model": "exact model name/number or null",
-  "category": "clothing|shoes|bag|camera|watch|accessory|electronics|vinyl|antique|other",
-  "subcategory": "specific type e.g. jeans, sneakers, film camera",
-  "color": "main color",
+  "brand": "brand/author/publisher or null if none visible",
+  "model": "exact model, title, edition or null",
+  "category": "clothing|shoes|bag|camera|watch|book|vinyl|electronics|antique|toy|jewelry|accessory|other",
+  "subcategory": "specific type e.g. novel, jeans, compact camera, vinyl record, action figure",
+  "color": "main color or dominant colors",
   "condition_estimate": "new|excellent|good|fair|poor",
-  "size_visible": null,
-  "gender": "men|women|unisex|unknown",
-  "search_query": "brand model specific 3-5 words for eBay search",
-  "confidence": 0.85,
+  "size_visible": "size if visible on label or null",
+  "gender": "men|women|unisex|unknown|na",
+  "search_query": "3-6 words optimized for eBay/Vinted search e.g. 'Alexandra Potter book paperback' or 'Olympus XA film camera'",
+  "confidence": 0.9,
   "is_luxury": false,
   "is_streetwear_sneaker": false,
   "is_camera_watch_collectible": false
 }
-For cameras: include brand + exact model in search_query e.g. "Olympus XA compact film camera"
-For watches: include brand + model e.g. "Casio G-Shock DW5600"
-If nothing identifiable: {"error":"no_item"}`;
+
+Examples:
+- Book visible → brand=author name, model=title, category="book", search_query="[title] [author] paperback"
+- Vinyl record → brand=artist, model=album title, category="vinyl"
+- Camera → brand=Olympus, model=XA, search_query="Olympus XA compact film camera"
+- Clothing with no brand → brand=null, subcategory=garment type, still return full JSON
+
+IMPORTANT: Always return a full JSON object. Only return {"error":"no_item"} if the image is completely blank, a hand with nothing, or totally unidentifiable. If you can see ANY object at all, describe it.`;
 
 async function identifyItem(b64) {
   const messages = [{
@@ -624,7 +631,7 @@ async function doScan() {
       scanning = false; setScanLine(false); return;
     }
 
-    if (item.confidence < 0.55 || !item.brand) {
+    if (item.confidence < 0.40 || !item.brand) {
       scanning = false; setScanLine(false);
       showClarify(item, b64);
       return;
