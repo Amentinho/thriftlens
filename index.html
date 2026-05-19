@@ -504,31 +504,47 @@ async function fetchPlatform(platform, query) {
   try {
     const actor = APIFY_ACTORS[platform];
     if (!actor) return simulatePrices(platform, query);
-    // Input formats verified against each Apify actor's schema
+
     const inputs = {
-      vinted:    { searchText: query, maxItems: 20, country: "ES" },
-      depop:     { search: query, maxItems: 20 },
-      wallapop:  { keywords: query, country: "ES", maxItems: 20 },
-      leboncoin: { keyword: query, maxResults: 20 },
-      subito:    { query: query, maxItems: 20 },
+      vinted:    { mode: "SEARCH", query: query, countries: ["es","fr","de","it","nl","pt"], maxItems: 20 },
+      depop:     { search: query, maxItems: 20, startPage: 1 },
+      wallapop:  { keywords: query, maxItems: 20 },
+      leboncoin: { startUrls: [{ url: `https://www.leboncoin.fr/recherche?text=${encodeURIComponent(query)}` }], maxItems: 20 },
+      subito:    { startUrls: [{ url: `https://www.subito.it/annunci-italia/vendita/usato/?q=${encodeURIComponent(query)}` }], maxItems: 20 },
     };
+
+    const timeout = platform === "vinted" ? 50000 : 35000;
     const res = await fetch(WORKER_URL+"/apify", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({actor, input:inputs[platform]||{query}}),
-      signal:AbortSignal.timeout(30000)
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({actor, input: inputs[platform]||{query}}),
+      signal: AbortSignal.timeout(timeout)
     });
-    if (!res.ok) return simulatePrices(platform, query);
-    const items = await res.json();
-    if (!Array.isArray(items)||!items.length) return simulatePrices(platform, query);
+
+    if (!res.ok) { console.warn(platform+" HTTP "+res.status); return simulatePrices(platform, query); }
+
+    const raw = await res.json();
+    console.log(platform+" raw:", JSON.stringify(raw).slice(0,300));
+
+    // Normalise: vinted-smart-scraper may return [{items:[...]}, ...]
+    const items = Array.isArray(raw)
+      ? (raw[0]?.items ? raw.flatMap(r => r.items||[]) : raw)
+      : [];
+
+    if (!items.length) { console.warn(platform+": empty"); return simulatePrices(platform, query); }
+
     const prices = items
-      .map(i=>parseFloat(String(i.price||i.currentPrice||i.salePrice||0).replace(/[^0-9.]/g,"")))
-      .filter(p=>p>1&&p<5000);
-    if (!prices.length) return simulatePrices(platform, query);
-    const favorites = items.map(i=>i.favouriteCount||i.favourite_count||i.likes||0);
-    return {prices, favorites, count:prices.length, simulated:false};
-  } catch(e) { return simulatePrices(platform, query); }
+      .map(i => parseFloat(String(i.price||i.priceNumeric||i.currentPrice||i.salePrice||0).replace(/[^0-9.]/g,"")))
+      .filter(p => p > 0.5 && p < 5000);
+
+    if (!prices.length) { console.warn(platform+": no prices. Sample:", JSON.stringify(items[0]).slice(0,200)); return simulatePrices(platform, query); }
+
+    const favorites = items.map(i => i.favouriteCount||i.favourite_count||i.likes||0);
+    return {prices, favorites, count: prices.length, simulated: false};
+
+  } catch(e) { console.warn(platform+" error:", e.message); return simulatePrices(platform, query); }
 }
+
 
 async function fetchEbay(query) {
   // Routes through worker: uses eBay official API if EBAY_APP_ID set, else HTML scrape
