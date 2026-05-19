@@ -660,34 +660,64 @@ async function fetchAndShow(item, b64) {
   const q = item.search_query;
   const raw = {};
 
-  // Phase 1: fast direct APIs
+  // ── Phase 0: Show simulation INSTANTLY (<10ms) so user sees prices right away
+  const simRaw = {};
+  for (const p of prefs.platforms) simRaw[p] = simulatePrices(p, q);
+  const simAgg = aggregate(simRaw, item);
+  if (simAgg) {
+    currentItem   = item;
+    currentPrices = { ...simAgg, enriching: true, simulated: true };
+    currentB64    = b64;
+    currentScan   = {
+      id: Date.now(), ts: new Date().toISOString(), tsDisplay: new Date().toLocaleTimeString(),
+      brand: item.brand||"Unknown", model: item.model||"",
+      category: item.category||"other", subcategory: item.subcategory||"",
+      color: item.color||"", condition: item.condition_estimate||"good",
+      search_query: q, prices: simAgg, thumb: b64, decision: null, mktPrice: null
+    };
+    renderDetail();
+    showScreen("detail");
+  }
+
+  // ── Phase 1: Fast real sources in parallel (eBay scrape ~3-5s)
   const fast = {};
   if (prefs.platforms.includes("ebay"))     fast.ebay     = fetchEbay(q);
-  if (prefs.platforms.includes("vinted"))   fast.vinted   = fetchVinted(q);
-  if (prefs.platforms.includes("wallapop")) fast.wallapop = fetchWallapop(q);
 
   await Promise.all(Object.entries(fast).map(async([p,t])=>{
     try{ raw[p]=await t; } catch(e){ raw[p]=simulatePrices(p,q); }
   }));
 
-  const fastAgg = aggregate(raw, item);
-  if (!fastAgg) { setErr("Could not get prices."); return; }
+  // Merge fast real data over simulation
+  for (const p of prefs.platforms) {
+    if (!raw[p]) raw[p] = simRaw[p];
+  }
 
-  // Save and show immediately
-  currentItem = item;
-  currentPrices = {...fastAgg, enriching:true};
-  currentB64 = b64;
-  currentScan = {
-    id:Date.now(), ts:new Date().toISOString(), tsDisplay:new Date().toLocaleTimeString(),
-    brand:item.brand||"Unknown", model:item.model||"",
-    category:item.category||"other", subcategory:item.subcategory||"",
-    color:item.color||"", condition:item.condition_estimate||"good",
-    search_query:q, prices:fastAgg, thumb:b64, decision:null, mktPrice:null
-  };
+  const fastAgg = aggregate(raw, item);
+  if (!fastAgg) { return; }
+
+  // Update with first real data (may already be on detail screen from Phase 0)
+  currentItem   = item;
+  currentPrices = { ...fastAgg, enriching: true };
+  currentB64    = b64;
+  if (!currentScan) {
+    currentScan = {
+      id:Date.now(), ts:new Date().toISOString(), tsDisplay:new Date().toLocaleTimeString(),
+      brand:item.brand||"Unknown", model:item.model||"",
+      category:item.category||"other", subcategory:item.subcategory||"",
+      color:item.color||"", condition:item.condition_estimate||"good",
+      search_query:q, prices:fastAgg, thumb:b64, decision:null, mktPrice:null
+    };
+  } else {
+    currentScan.prices = fastAgg;
+  }
 
   dbSave(currentScan).catch(()=>{});
-  renderDetail();
-  showScreen("detail");
+  updateDetailPrices();
+  if (document.getElementById("detail-screen").style.display === "none" ||
+      !document.getElementById("detail-screen").classList.contains("visible")) {
+    renderDetail();
+    showScreen("detail");
+  }
 
   // Phase 2: background enrichment via Apify
   // Phase 2: ALL platforms via Apify through worker (real data)
@@ -865,6 +895,42 @@ function updateSignal() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // DECISIONS + HISTORY
 // ═══════════════════════════════════════════════════════════════════════════════
+function shareWhatsApp() {
+  if (!currentItem || !currentPrices) return;
+  const item    = currentItem;
+  const prices  = currentPrices;
+  const label   = [item.brand, item.model||item.subcategory].filter(Boolean).join(" ");
+  const prop    = prices.propensity;
+  const propTxt = prop > 70 ? "🔥 High demand" : prop > 40 ? "⚠️ Medium demand" : "📉 Low demand";
+  const mp      = document.getElementById("mkt-price").value;
+  const mktTxt  = mp ? `\nSeller asking: €${mp}` : "";
+  const buyTxt  = mp && prices.buyThreshold
+    ? (parseFloat(mp) <= prices.buyThreshold ? "\n✅ GOOD BUY" : parseFloat(mp) <= prices.maybeThreshold ? "\n⚠️ MAYBE" : "\n❌ PASS")
+    : "";
+
+  const platforms = Object.entries(prices.platforms)
+    .map(([p,d]) => `  ${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}: €${d.median}`)
+    .join("\n");
+
+  const msg = `🏷️ *ThriftLens Scan*
+
+*${label}*
+📦 ${item.subcategory||item.category} · ${item.condition_estimate}
+
+💰 *Avg resale: €${prices.weightedMedian}*
+📊 Range: €${prices.overallP25} – €${prices.overallMedian}${mktTxt}${buyTxt}
+
+${propTxt} (${prop}%)
+
+*By platform:*
+${platforms}
+
+_Scanned with ThriftLens · amentinho.github.io/thriftlens_`;
+
+  const url = "https://wa.me/?text=" + encodeURIComponent(msg);
+  window.open(url, "_blank");
+}
+
 function recordDecision(decision) {
   if (currentScan) {
     const mp = parseFloat(document.getElementById("mkt-price").value)||null;
