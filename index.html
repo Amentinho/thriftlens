@@ -10,7 +10,7 @@
   <title>ThriftLens</title>
   <link rel="manifest" href="manifest.json"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.21.1/index.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;background:#080810;overflow:hidden}
@@ -857,9 +857,22 @@ async function startBarcodeMode() {
   if (barcodeMode) { stopBarcodeMode(); return; }
 
   // Use ZXing library for cross-browser barcode scanning
-  if (typeof ZXing === "undefined") {
-    setErr("Barcode library loading... try again in a second.");
-    return;
+  // Check ZXing loaded (try multiple possible namespaces)
+  const ZXingLib = (typeof ZXing !== "undefined") ? ZXing :
+                   (typeof window.ZXing !== "undefined") ? window.ZXing : null;
+  if (!ZXingLib || !ZXingLib.BrowserMultiFormatReader) {
+    // Try loading dynamically
+    setStatus("📦 Loading scanner...");
+    await new Promise((res,rej) => {
+      const s = document.createElement("script");
+      s.src = "https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    }).catch(()=>{});
+    if (typeof ZXing === "undefined") {
+      setErr("Scanner failed to load. Check internet connection.");
+      return;
+    }
   }
 
   barcodeMode = true;
@@ -868,7 +881,8 @@ async function startBarcodeMode() {
   btn.textContent = "⏹ STOP";
   setStatus("📦 Point at barcode/ISBN — hold steady");
 
-  const codeReader = new ZXing.BrowserMultiFormatReader();
+  const ZXingLib2 = typeof ZXing !== "undefined" ? ZXing : window.ZXing;
+  const codeReader = new ZXingLib2.BrowserMultiFormatReader();
   barcodeDetector = codeReader;
 
   try {
