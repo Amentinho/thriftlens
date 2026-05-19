@@ -427,18 +427,21 @@ async function fetchVinted(query) {
     if (!runId) { console.warn("Vinted: no runId returned"); return simulatePrices("vinted",query); }
     console.log("Vinted: run started", runId, "cleanQuery:", cleanQuery);
 
-    // Step 2: Poll status via worker (token stays in worker)
-    const deadline = Date.now() + 90000;  // 90s max wait
+    // Step 2: Poll status via worker every 5s, up to 90s
+    const deadline = Date.now() + 90000;
     let status = "RUNNING";
+    let pollErrors = 0;
     while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 4000));
+      await new Promise(r => setTimeout(r, 5000));
       try {
-        const statusRes = await fetchWithTimeout(WORKER_URL+"/vinted/status?runId="+runId, {}, 6000);
+        const statusRes = await fetchWithTimeout(WORKER_URL+"/vinted/status?runId="+runId, {}, 8000);
+        if (!statusRes.ok) { pollErrors++; console.warn("Vinted poll HTTP:", statusRes.status); continue; }
         const statusData = await statusRes.json();
-        status = statusData?.status || "RUNNING";
-        console.log("Vinted status:", status);
+        if (statusData.error) { pollErrors++; console.warn("Vinted poll error:", statusData.error); continue; }
+        status = statusData.status || "RUNNING";
+        console.log("Vinted status:", status, "elapsed:", Math.round((Date.now()-deadline+90000)/1000)+"s");
         if (status === "SUCCEEDED" || status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") break;
-      } catch(e) { console.warn("Vinted poll error:", e.message); }
+      } catch(e) { pollErrors++; console.warn("Vinted poll exception:", e.message); }
     }
 
     if (status !== "SUCCEEDED") { console.warn("Vinted run ended:", status); return simulatePrices("vinted",query); }
