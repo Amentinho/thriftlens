@@ -10,6 +10,7 @@
   <title>ThriftLens</title>
   <link rel="manifest" href="manifest.json"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.21.1/index.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;background:#080810;overflow:hidden}
@@ -118,7 +119,7 @@
       </div>
       <div id="cam-status">Starting camera...</div>
       <button id="manual-btn" onclick="doScan()">📸</button>
-      <button id="barcode-btn" onclick="startBarcodeMode()" style="position:absolute;bottom:10px;left:12px;width:54px;height:54px;border-radius:50%;background:#ffd600;border:none;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Scan barcode/ISBN">📦</button>
+      <button id="barcode-btn" onclick="startBarcodeMode()" style="position:absolute;top:10px;left:12px;padding:6px 12px;border-radius:20px;background:#ffd600;border:none;font-size:13px;font-family:inherit;cursor:pointer;font-weight:700;letter-spacing:1px" title="Scan barcode/ISBN">📦 BARCODE</button>
     </div>
     <div id="cam-err"></div>
   </div>
@@ -853,36 +854,58 @@ let barcodeInterval = null;
 let barcodeMode = false;
 
 async function startBarcodeMode() {
-  if (!("BarcodeDetector" in window)) {
-    setErr("Barcode scanning not supported. Use Safari on iOS 16+ or Chrome.");
+  if (barcodeMode) { stopBarcodeMode(); return; }
+
+  // Use ZXing library for cross-browser barcode scanning
+  if (typeof ZXing === "undefined") {
+    setErr("Barcode library loading... try again in a second.");
     return;
   }
-  if (barcodeMode) { stopBarcodeMode(); return; }
+
   barcodeMode = true;
-  barcodeDetector = new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","qr_code","code_128"]});
-  document.getElementById("barcode-btn").style.background = "#ff4444";
-  document.getElementById("barcode-btn").textContent = "⏹";
+  const btn = document.getElementById("barcode-btn");
+  btn.style.background = "#ff4444";
+  btn.textContent = "⏹ STOP";
   setStatus("📦 Point at barcode/ISBN — hold steady");
-  barcodeInterval = setInterval(async () => {
+
+  const codeReader = new ZXing.BrowserMultiFormatReader();
+  barcodeDetector = codeReader;
+
+  try {
     const video = document.getElementById("video");
-    if (!video || video.readyState < 2) return;
-    try {
-      const codes = await barcodeDetector.detect(video);
-      if (codes && codes.length > 0) {
-        const code = codes[0].rawValue;
-        console.log("Barcode detected:", code, codes[0].format);
-        stopBarcodeMode();
-        await lookupBarcode(code);
+    // ZXing can decode from video element directly
+    barcodeInterval = setInterval(async () => {
+      if (!barcodeMode || !video || video.readyState < 2) return;
+      try {
+        const canvas = document.getElementById("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        const result = await codeReader.decodeFromCanvas(canvas);
+        if (result && result.getText()) {
+          const code = result.getText();
+          console.log("Barcode detected:", code, result.getBarcodeFormat());
+          stopBarcodeMode();
+          await lookupBarcode(code);
+        }
+      } catch(e) {
+        // NotFoundException is normal when no barcode in frame — ignore
+        if (e.name !== "NotFoundException") console.warn("ZXing:", e.message);
       }
-    } catch(e) {}
-  }, 500);
+    }, 400);
+  } catch(e) {
+    setErr("Barcode error: " + e.message);
+    stopBarcodeMode();
+  }
 }
 
 function stopBarcodeMode() {
   barcodeMode = false;
   clearInterval(barcodeInterval);
+  if (barcodeDetector && barcodeDetector.reset) barcodeDetector.reset();
+  barcodeDetector = null;
   const btn = document.getElementById("barcode-btn");
-  if (btn) { btn.style.background = "#ffd600"; btn.textContent = "📦"; }
+  if (btn) { btn.style.background = "#ffd600"; btn.textContent = "📦 BARCODE"; }
 }
 
 async function lookupBarcode(code) {
