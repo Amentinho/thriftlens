@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="theme-color" content="#080810"/>
@@ -18,30 +19,25 @@
     input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     ::-webkit-scrollbar{display:none}
 
-    /* Header */
     #header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
       border-bottom:1px solid #1a1a2e;background:rgba(8,8,16,.97);position:sticky;top:0;z-index:100}
     .logo{font-size:15px;letter-spacing:4px;color:#8080a0;font-weight:300}
     .logo b{color:#00ff87;font-weight:700;letter-spacing:2px}
     .tabs{display:flex;gap:4px}
-    .tab{background:transparent;border:1px solid #1a1a2e;color:#666;padding:6px 10px;
-      border-radius:6px;cursor:pointer;font-size:11px}
+    .tab{background:transparent;border:1px solid #1a1a2e;color:#666;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px}
     .tab.active{background:#00ff8710;border-color:#00ff87;color:#00ff87}
 
-    /* Screens */
     .screen{display:none;padding:16px;padding-bottom:60px;animation:fadeIn .3s ease}
     .screen.visible{display:block}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
     @keyframes scanline{0%{top:20%}50%{top:75%}100%{top:20%}}
 
-    /* Cards */
     .card{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:12px;padding:16px;margin-bottom:12px}
     .lbl{display:block;font-size:10px;letter-spacing:2px;color:#00ff87;margin-bottom:6px;text-transform:uppercase}
     .hint{font-size:11px;color:#555;margin-bottom:10px;line-height:1.6}
     .section-title{font-size:11px;letter-spacing:4px;color:#8080a0;margin-bottom:16px;text-transform:uppercase}
 
-    /* Camera screen */
     #cam-screen{display:none;flex-direction:column}
     #cam-screen.visible{display:flex}
     #cam-wrap{position:relative;width:100%;background:#000;flex-shrink:0}
@@ -54,64 +50,44 @@
     #cam-status{position:absolute;bottom:0;left:0;right:0;padding:8px 16px;
       background:linear-gradient(transparent,rgba(8,8,16,.9));font-size:12px;color:#00ff87;letter-spacing:1px}
     #manual-btn{position:absolute;bottom:10px;right:12px;width:54px;height:54px;border-radius:50%;
-      background:#00ff87;border:none;font-size:26px;cursor:pointer;display:none;
-      align-items:center;justify-content:center}
+      background:#00ff87;border:none;font-size:26px;cursor:pointer;display:none;align-items:center;justify-content:center}
 
-    /* Detail screen */
     #detail-screen{display:none;padding:16px;padding-bottom:120px;animation:fadeIn .3s ease}
     #detail-screen.visible{display:block}
-    #detail-thumb{width:88px;height:88px;object-fit:cover;border-radius:12px;
-      border:2px solid #1a1a2e;flex-shrink:0}
+    #detail-thumb{width:88px;height:88px;object-fit:cover;border-radius:12px;border:2px solid #1a1a2e;flex-shrink:0}
     .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;letter-spacing:1px;margin:2px}
     .badge.green{background:#00ff8715;border:1px solid #00ff8740;color:#00ff87}
     .badge.gray{background:#ffffff08;border:1px solid #2a2a3e;color:#666}
-    .big-price{font-size:48px;font-weight:700;color:#e8e8f0;line-height:1}
     .prop-bar-bg{height:8px;background:#080810;border-radius:4px;overflow:hidden;margin:8px 0}
     .prop-bar-fill{height:100%;border-radius:4px;transition:width .8s ease}
     .platform-row{display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid #080810}
-    .buy-btn{padding:20px 0;border-radius:16px;border:2px solid;font-size:16px;font-weight:700;
-      cursor:pointer;letter-spacing:2px;flex:1}
+    .buy-btn{padding:20px 0;border-radius:16px;border:2px solid;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:2px;flex:1}
     .buy-btn.yes{border-color:#00ff87;background:#00ff8720;color:#00ff87}
     .buy-btn.no{border-color:#ff4444;background:#ff444420;color:#ff4444}
-    .skip-btn{width:100%;margin-top:12px;padding:14px;border-radius:12px;border:1px solid #2a2a3e;
-      background:transparent;color:#555;font-size:12px;cursor:pointer}
+    .skip-btn{width:100%;margin-top:12px;padding:14px;border-radius:12px;border:1px solid #2a2a3e;background:transparent;color:#555;font-size:12px;cursor:pointer}
 
-    /* History */
     .stat-box{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:10px;padding:10px 8px;text-align:center}
     .stat-val{font-size:18px;font-weight:700;line-height:1.2}
     .stat-lbl{font-size:9px;color:#555;margin-top:3px;letter-spacing:1px;text-transform:uppercase}
-    .hist-card{display:flex;gap:12px;background:#0d0d1a;border:1px solid #1a1a2e;
-      border-radius:12px;padding:12px;margin-bottom:10px}
+    .hist-card{display:flex;gap:12px;background:#0d0d1a;border:1px solid #1a1a2e;border-radius:12px;padding:12px;margin-bottom:10px}
     .hist-thumb-wrap{position:relative;flex-shrink:0}
     .hist-thumb{width:66px;height:66px;object-fit:cover;border-radius:8px}
-    .dec-dot{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+    .dec-dot{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 
-    /* Preferences */
-    .chip{padding:7px 14px;border-radius:20px;border:1px solid #2a2a3e;background:transparent;
-      color:#666;cursor:pointer;font-size:12px}
+    .chip{padding:7px 14px;border-radius:20px;border:1px solid #2a2a3e;background:transparent;color:#666;cursor:pointer;font-size:12px}
     .chip.active{background:#00ff8720;border-color:#00ff87;color:#00ff87}
-    .platform-btn{padding:9px 10px;border-radius:8px;border:1px solid #333;background:transparent;
-      color:#555;cursor:pointer;font-size:12px;transition:all .2s}
     .toggle-wrap{display:flex;justify-content:space-between;align-items:center}
-    .toggle{width:46px;height:24px;border-radius:12px;border:none;cursor:pointer;
-      position:relative;padding:2px;display:flex;align-items:center;transition:background .3s}
+    .toggle{width:46px;height:24px;border-radius:12px;border:none;cursor:pointer;position:relative;padding:2px;display:flex;align-items:center;transition:background .3s}
     .toggle-knob{width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
-    .cta-btn{width:100%;padding:16px;background:linear-gradient(135deg,#00ff87,#00ccff);
-      border:none;border-radius:12px;color:#080810;font-weight:700;font-size:15px;
-      cursor:pointer;letter-spacing:2px;margin-top:8px}
-    .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .cta-btn{width:100%;padding:16px;background:linear-gradient(135deg,#00ff87,#00ccff);border:none;border-radius:12px;color:#080810;font-weight:700;font-size:15px;cursor:pointer;letter-spacing:2px;margin-top:8px}
     .chips-row{display:flex;gap:8px;flex-wrap:wrap}
-
-    /* Misc */
-    .err-box{margin:16px;padding:14px;background:#ff444415;border:1px solid #ff444440;
-      border-radius:10px;font-size:12px;color:#ff6666}
+    .err-box{margin:16px;padding:14px;background:#ff444415;border:1px solid #ff444440;border-radius:10px;font-size:12px;color:#ff6666}
     .calc-box{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:12px;padding:16px;margin-bottom:16px}
-    .price-input{flex:1;background:#080810;border:1px solid #2a2a3e;border-radius:8px;
-      padding:12px;color:#e8e8f0;font-size:20px;width:100%}
-    .signal-box{padding:10px 14px;border-radius:10px;border:1px solid;font-size:13px;
-      font-weight:700;text-align:center;flex-shrink:0;min-width:80px}
-    .enrich-note{text-align:center;font-size:10px;padding:8px 0;border-top:1px solid #1a1a2e;margin-bottom:12px}
+    .price-input{flex:1;background:#080810;border:1px solid #2a2a3e;border-radius:8px;padding:12px;color:#e8e8f0;font-size:20px;width:100%}
+    .signal-box{padding:10px 14px;border-radius:10px;border:1px solid;font-size:13px;font-weight:700;text-align:center;flex-shrink:0;min-width:80px}
+    .live-badge{font-size:9px;padding:1px 5px;border-radius:4px;background:#00ff8720;color:#00ff87;margin-left:4px}
+    .est-badge{font-size:9px;padding:1px 5px;border-radius:4px;background:#2a2a2a;color:#555;margin-left:4px}
+    .enrich-note{text-align:center;font-size:10px;padding:8px 0;margin-bottom:12px}
     .empty{text-align:center;color:#444;padding:60px 20px;font-size:14px}
     .stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:20px}
   </style>
@@ -119,17 +95,16 @@
 <body>
 <div id="app">
 
-  <!-- HEADER -->
   <div id="header">
     <div class="logo">🏷️ THRIFT<b>LENS</b></div>
     <div class="tabs">
-      <button class="tab active" id="tab-cam"    onclick="showScreen('cam')">📷</button>
-      <button class="tab"        id="tab-history" onclick="showScreen('history')">🗂 <span id="scan-count"></span></button>
-      <button class="tab"        id="tab-prefs"   onclick="showScreen('prefs')">⚙️</button>
+      <button class="tab active" id="tab-cam"     onclick="showScreen('cam')">📷</button>
+      <button class="tab"        id="tab-history"  onclick="showScreen('history')">🗂 <span id="scan-count"></span></button>
+      <button class="tab"        id="tab-prefs"    onclick="showScreen('prefs')">⚙️</button>
     </div>
   </div>
 
-  <!-- CAMERA SCREEN -->
+  <!-- CAMERA -->
   <div id="cam-screen" class="screen visible">
     <div id="cam-wrap">
       <video id="video" playsinline muted autoplay></video>
@@ -147,7 +122,7 @@
     <div id="cam-err"></div>
   </div>
 
-  <!-- DETAIL SCREEN -->
+  <!-- DETAIL -->
   <div id="detail-screen">
     <div style="display:flex;gap:14px;margin-bottom:20px;align-items:flex-start">
       <img id="detail-thumb" src="" alt=""/>
@@ -160,9 +135,9 @@
 
     <div class="card" style="text-align:center;margin-bottom:16px">
       <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Weighted Resale Price</div>
-      <div class="big-price" id="detail-price">—</div>
+      <div style="font-size:48px;font-weight:700;line-height:1" id="detail-price">—</div>
       <div id="detail-range" style="font-size:12px;color:#555;margin-top:8px"></div>
-      <div id="detail-data-note" class="enrich-note" style="margin-top:8px;border-top:none"></div>
+      <div id="detail-note" class="enrich-note" style="margin-top:8px"></div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -195,23 +170,21 @@
     </button>
   </div>
 
-  <!-- HISTORY SCREEN -->
+  <!-- HISTORY -->
   <div id="history-screen" class="screen">
     <div class="stats-grid" id="stats-grid" style="display:none"></div>
     <div class="section-title">All Scans</div>
     <div id="history-list"><div class="empty">No scans yet. Go find some deals! 🧺</div></div>
   </div>
 
-  <!-- PREFERENCES SCREEN -->
+  <!-- PREFERENCES -->
   <div id="prefs-screen" class="screen">
     <div class="section-title">Preferences</div>
-
     <div class="card">
       <label class="lbl">Auto-scan interval</label>
       <p class="hint">How often to capture a frame automatically.</p>
       <div class="chips-row" id="interval-chips"></div>
     </div>
-
     <div class="card toggle-wrap">
       <div>
         <label class="lbl" style="margin-bottom:2px">Auto-scan</label>
@@ -221,61 +194,34 @@
         <div class="toggle-knob" id="toggle-knob"></div>
       </button>
     </div>
-
-    <div class="card">
-      <label class="lbl">Active Platforms</label>
-      <div class="pgrid" id="platform-grid"></div>
-    </div>
-
     <button class="cta-btn" onclick="showScreen('cam')">📷 Start Scanning</button>
   </div>
 
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════════════════
-// CONFIG — set your Cloudflare Worker URL after deploying worker.js
-// Keys stay in the Worker (never exposed in browser)
-// ═══════════════════════════════════════════════════════════════════════════════
-const WORKER_URL  = "https://thriftlens.andrea-amenta87.workers.dev";
-// All API keys are stored securely in the Cloudflare Worker — none exposed here
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG — keys live in Cloudflare Worker, not here
+// ═══════════════════════════════════════════════════════════════════
+const WORKER_URL = "https://thriftlens.andrea-amenta87.workers.dev";
 
 const PLATFORMS = {
-  ebay:      { name:"eBay EU",   color:"#e53238", emoji:"🛒" },
-  vinted:    { name:"Vinted",    color:"#09b1ba", emoji:"👗" },
-  depop:     { name:"Depop",     color:"#ff2300", emoji:"🔴" },
-  wallapop:  { name:"Wallapop",  color:"#13c1ac", emoji:"🟢" },
-  stockx:    { name:"StockX",    color:"#00ff87", emoji:"👟" },
-  leboncoin: { name:"LeBonCoin", color:"#f56b2a", emoji:"🇫🇷" },
-  subito:    { name:"Subito.it", color:"#cc0033", emoji:"🇮🇹" },
+  vinted: { name:"Vinted",  color:"#09b1ba", emoji:"👗" },
+  ebay:   { name:"eBay EU", color:"#e53238", emoji:"🛒" },
 };
 
-const APIFY_ACTORS = {
-  vinted:    "kazkn~vinted-smart-scraper",
-  depop:     "epctex~depop-scraper",
-  wallapop:  "louisdeconinck~wallapop-scraper",
-  leboncoin: "apify~leboncoin-scraper",
-  subito:    "epctex~subito-scraper",
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // STATE
-// ═══════════════════════════════════════════════════════════════════════════════
-let prefs = { interval:3, autoScan:true, platforms:Object.keys(PLATFORMS) };
+// ═══════════════════════════════════════════════════════════════════
+let prefs = { interval:3, autoScan:true };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem("tl_prefs")||"{}") }; } catch(e){}
 
-let currentItem   = null;
-let currentPrices = null;
-let currentScan   = null;
-let currentB64    = null;
-let scanning      = false;
-let lastScanTime  = 0;
-let scanTimer     = null;
-let stream        = null;
+let currentItem=null, currentPrices=null, currentScan=null, currentB64=null;
+let scanning=false, lastScanTime=0, scanTimer=null, stream=null;
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // INDEXEDDB
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 function openDB() {
   return new Promise((res,rej) => {
     const req = indexedDB.open("thriftlens",1);
@@ -296,7 +242,7 @@ async function dbSave(scan) {
   return new Promise((res,rej) => {
     const tx = db.transaction("scans","readwrite");
     tx.objectStore("scans").put(scan);
-    tx.oncomplete = res; tx.onerror = rej;
+    tx.oncomplete=res; tx.onerror=rej;
   });
 }
 async function dbAll() {
@@ -307,721 +253,490 @@ async function dbAll() {
     req.onerror = rej;
   });
 }
+async function dbStats() {
+  const all = await dbAll();
+  const bought=all.filter(r=>r.decision==="buy").length;
+  const passed=all.filter(r=>r.decision==="pass").length;
+  const cats={};
+  all.forEach(r=>{ cats[r.category]=(cats[r.category]||0)+1; });
+  const topCat=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+  return {total:all.length, bought, passed, topCat};
+}
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SCREEN NAVIGATION
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN NAV
+// ═══════════════════════════════════════════════════════════════════
 function showScreen(name) {
-  // Hide all
   document.getElementById("cam-screen").classList.remove("visible");
   document.getElementById("detail-screen").classList.remove("visible");
   document.getElementById("history-screen").classList.remove("visible");
   document.getElementById("prefs-screen").classList.remove("visible");
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
 
-  if (name === "cam") {
+  if (name==="cam") {
     document.getElementById("cam-screen").classList.add("visible");
     document.getElementById("tab-cam").classList.add("active");
     startCamera();
-  } else if (name === "detail") {
+  } else if (name==="detail") {
     document.getElementById("detail-screen").classList.add("visible");
     document.getElementById("tab-cam").classList.add("active");
     stopCamera();
-  } else if (name === "history") {
+  } else if (name==="history") {
     document.getElementById("history-screen").classList.add("visible");
     document.getElementById("tab-history").classList.add("active");
-    stopCamera();
-    renderHistory();
-  } else if (name === "prefs") {
+    stopCamera(); renderHistory();
+  } else if (name==="prefs") {
     document.getElementById("prefs-screen").classList.add("visible");
     document.getElementById("tab-prefs").classList.add("active");
     stopCamera();
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // CAMERA
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 async function startCamera() {
   clearInterval(scanTimer);
-  if (stream) return; // already running
+  if (stream) return;
   setStatus("Starting camera...");
   try {
-    // Try rear camera first, fall back to any camera (desktop compatibility)
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode:{exact:"environment"}, width:{ideal:1280} }
-      });
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"},width:{ideal:1280}}});
     } catch(e) {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video:{ width:{ideal:1280} }
-      });
+      stream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280}}});
     }
     const video = document.getElementById("video");
     video.srcObject = stream;
     await video.play();
     setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
     document.getElementById("manual-btn").style.display = prefs.autoScan ? "none" : "flex";
-    if (prefs.autoScan) {
-      scanTimer = setInterval(doScan, prefs.interval * 1000);
-    }
+    if (prefs.autoScan) scanTimer = setInterval(doScan, prefs.interval*1000);
   } catch(e) {
-    setErr("Camera blocked. Open in Safari and allow camera access.\n\n" + e.message);
+    setErr("Camera blocked. Open in Safari and allow camera. " + e.message);
   }
 }
 
 function stopCamera() {
   clearInterval(scanTimer);
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
+  if (stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
 }
 
 function captureFrame() {
-  const video  = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
-  if (!video || video.readyState < 2) return null;
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-  return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+  const video=document.getElementById("video"), canvas=document.getElementById("canvas");
+  if (!video||video.readyState<2) return null;
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  return canvas.toDataURL("image/jpeg",0.82).split(",")[1];
 }
 
-function setStatus(msg) {
-  const el = document.getElementById("cam-status");
-  if (el) el.textContent = msg;
-}
-function setErr(msg) {
-  const el = document.getElementById("cam-err");
-  if (el) { el.className = "err-box"; el.textContent = msg; }
-}
+function setStatus(msg) { const el=document.getElementById("cam-status"); if(el) el.textContent=msg; }
+function setErr(msg) { const el=document.getElementById("cam-err"); if(el){el.className="err-box";el.textContent=msg;} }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// VISION
-// ═══════════════════════════════════════════════════════════════════════════════
-const VISION_PROMPT = `You are a secondhand resale pricing expert for flea markets and thrift stores.
-Your job is to identify ANY object that could be resold: clothing, shoes, bags, cameras, watches, books, vinyl records, antiques, electronics, toys, accessories, jewelry, art, furniture, or any other physical item.
-
-Return ONLY valid JSON, no markdown, no explanation:
+// ═══════════════════════════════════════════════════════════════════
+// VISION PROMPT
+// ═══════════════════════════════════════════════════════════════════
+const VISION_PROMPT = `You are a secondhand resale expert. Identify the item in the image for pricing.
+Return ONLY valid JSON, no markdown:
 {
-  "brand": "brand/author/publisher or null if none visible",
-  "model": "exact model, title, edition or null",
+  "brand": "exact brand/author or null",
+  "model": "exact model/title or null",
   "category": "clothing|shoes|bag|camera|watch|book|vinyl|electronics|antique|toy|jewelry|accessory|other",
-  "subcategory": "specific type e.g. novel, jeans, compact camera, vinyl record, action figure",
-  "color": "main color or dominant colors",
+  "subcategory": "specific type e.g. jeans, novel, film camera",
+  "color": "main color",
   "condition_estimate": "new|excellent|good|fair|poor",
-  "size_visible": "size if visible on label or null",
+  "size_visible": null,
   "gender": "men|women|unisex|unknown|na",
-  "search_query": "3-6 words optimized for eBay/Vinted search e.g. 'Alexandra Potter book paperback' or 'Olympus XA film camera'",
+  "search_query": "3-6 words for Vinted/eBay search e.g. 'Olympus XA film camera' or 'Julia Viejo novela'",
   "confidence": 0.9,
   "is_luxury": false,
   "is_streetwear_sneaker": false,
   "is_camera_watch_collectible": false
 }
-
-Examples:
-- Book visible → brand=author name, model=title, category="book", search_query="[title] [author] paperback"
-- Vinyl record → brand=artist, model=album title, category="vinyl"
-- Camera → brand=Olympus, model=XA, search_query="Olympus XA compact film camera"
-- Clothing with no brand → brand=null, subcategory=garment type, still return full JSON
-
-IMPORTANT: Always return a full JSON object. Only return {"error":"no_item"} if the image is completely blank, a hand with nothing, or totally unidentifiable. If you can see ANY object at all, describe it.`;
+Always return full JSON. Only {"error":"no_item"} if image is completely blank.`;
 
 async function identifyItem(b64) {
-  const messages = [{
-    role:"user",
-    content:[
-      { type:"text", text: VISION_PROMPT },
-      { type:"image_url", image_url:{ url:"data:image/jpeg;base64,"+b64, detail:"low" }}
-    ]
-  }];
-
-  let data;
-  if (WORKER_URL && !WORKER_URL.includes("YOUR_WORKER")) {
-    // Use Cloudflare Worker proxy (no CORS issues)
-    const res = await fetch(WORKER_URL+"/vision", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({messages}),
-      signal:AbortSignal.timeout(20000)
-    });
-    data = await res.json();
-  } else if (OPENAI_KEY) {
-    // Direct call (only works on localhost, not GitHub Pages)
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENAI_KEY},
-      body:JSON.stringify({model:"gpt-4o",max_tokens:600,messages}),
-      signal:AbortSignal.timeout(20000)
-    });
-    data = await res.json();
-  } else {
-    throw new Error("No API configured. Set WORKER_URL in the code.");
-  }
-
-  if (data.error) throw new Error(data.error.message);
+  const res = await fetch(WORKER_URL+"/vision", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({messages:[{role:"user",content:[
+      {type:"text",text:VISION_PROMPT},
+      {type:"image_url",image_url:{url:"data:image/jpeg;base64,"+b64,detail:"low"}}
+    ]}]}),
+    signal:AbortSignal.timeout(20000)
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message||JSON.stringify(data.error));
   const text = (data.choices?.[0]?.message?.content||"{}").replace(/```json|```/g,"").trim();
   return JSON.parse(text);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PRICE FETCHERS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// PRICE SIMULATION (fallback)
+// ═══════════════════════════════════════════════════════════════════
 function simulatePrices(platform, query) {
   const q = query.toLowerCase();
-  let base = 22;
-  if (/olympus xa/.test(q))           base = 110;
-  else if (/olympus mju|stylus/.test(q)) base = 85;
-  else if (/canon ae.1/.test(q))      base = 130;
-  else if (/leica/.test(q))           base = 800;
-  else if (/polaroid/.test(q))        base = 65;
-  else if (/rolex/.test(q))           base = 3500;
-  else if (/casio/.test(q))           base = 45;
-  else if (/seiko/.test(q))           base = 120;
-  else if (/film camera|analog/.test(q)) base = 60;
-  else if (/nike|adidas/.test(q))     base = 48;
-  else if (/levi/.test(q))            base = 34;
-  else if (/gucci|prada|hermes/.test(q)) base = 320;
-  else if (/zara|h&m|mango/.test(q))  base = 12;
-  else if (/jordan|yeezy/.test(q))    base = 190;
-  else if (/ralph lauren|lacoste/.test(q)) base = 42;
-  else if (/vintage|retro/.test(q))   base *= 1.4;
-  if (/jacket|coat/.test(q)) base *= 1.5;
-  if (/shoes|sneaker/.test(q)) base *= 1.4;
-  const mult = {ebay:.95,vinted:.82,depop:1.1,wallapop:.75,stockx:1.85,leboncoin:.70,subito:.73};
+  let base = 20;
+  if (/olympus xa/.test(q))             base=110;
+  else if (/olympus mju|stylus/.test(q)) base=85;
+  else if (/canon ae.1/.test(q))         base=130;
+  else if (/leica/.test(q))              base=800;
+  else if (/polaroid/.test(q))           base=65;
+  else if (/rolex/.test(q))              base=3500;
+  else if (/casio g.shock/.test(q))      base=55;
+  else if (/seiko/.test(q))              base=120;
+  else if (/film camera|analog/.test(q)) base=60;
+  else if (/nike|adidas/.test(q))        base=48;
+  else if (/levi/.test(q))               base=34;
+  else if (/gucci|prada|hermes/.test(q)) base=320;
+  else if (/zara|h&m|mango/.test(q))     base=12;
+  else if (/jordan|yeezy/.test(q))       base=190;
+  else if (/ralph lauren|lacoste/.test(q))base=42;
+  else if (/libro|novela|book/.test(q))  base=8;
+  else if (/vinyl|disco|lp/.test(q))     base=15;
+  if (/vintage|retro/.test(q)) base*=1.4;
+  if (/jacket|coat/.test(q))   base*=1.5;
+
+  const mult = {vinted:0.82, ebay:0.95};
   const m = mult[platform]||1;
-  const count = 8 + Math.floor(Math.random()*10);
-  const prices = Array.from({length:count},()=>
-    Math.round(base*m*(0.7+Math.random()*.65)*100)/100);
+  const count = 8+Math.floor(Math.random()*10);
+  const prices = Array.from({length:count},()=>Math.round(base*m*(0.7+Math.random()*.65)*100)/100);
   const favorites = Array.from({length:count},()=>Math.floor(Math.random()*20));
   return {prices,favorites,count,simulated:true};
 }
 
-async function fetchPlatform(platform, query) {
-  const actor = APIFY_ACTORS[platform];
-  if (!actor || !WORKER_URL || WORKER_URL.includes("YOUR_WORKER")) {
-    return simulatePrices(platform, query);
-  }
-
-  const inputs = {
-    vinted:    { mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 },
-    depop:     { search:query, maxItems:20 },
-    wallapop:  { keywords:query, maxItems:20 },
-    leboncoin: { startUrls:[{url:`https://www.leboncoin.fr/recherche?text=${encodeURIComponent(query)}`}], maxItems:20 },
-    subito:    { startUrls:[{url:`https://www.subito.it/annunci-italia/vendita/usato/?q=${encodeURIComponent(query)}`}], maxItems:20 },
-  };
-
+// ═══════════════════════════════════════════════════════════════════
+// VINTED — via worker (run-sync, working pattern from before)
+// ═══════════════════════════════════════════════════════════════════
+async function fetchVinted(query) {
   try {
-    // Step 1: start run via worker (token stays in worker, returns runId)
-    const startRes = await fetch(WORKER_URL + "/apify/start", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ actor, input: inputs[platform] || {query} }),
-      signal: AbortSignal.timeout(10000)
+    const res = await fetch(WORKER_URL+"/apify", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        actor:"kazkn~vinted-smart-scraper",
+        input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 }
+      }),
+      signal:AbortSignal.timeout(35000)
     });
-
-    if (!startRes.ok) { console.warn(platform+" start HTTP "+startRes.status); return simulatePrices(platform,query); }
-
-    const { runId, datasetId } = await startRes.json();
-    if (!runId) { console.warn(platform+": no runId"); return simulatePrices(platform,query); }
-    console.log(platform+" started runId:", runId);
-
-    // Step 2: poll status via worker (token stays in worker)
-    const deadline = Date.now() + 50000;
-    let status = "RUNNING";
-
-    while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 3000));
-      const statusRes = await fetch(WORKER_URL + "/apify/status", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ runId }),
-        signal: AbortSignal.timeout(5000)
-      });
-      const statusData = await statusRes.json();
-      status = statusData.status || "RUNNING";
-      console.log(platform+" status:", status);
-      if (status === "SUCCEEDED" || status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") break;
-    }
-
-    if (status !== "SUCCEEDED") { console.warn(platform+" ended with:", status); return simulatePrices(platform,query); }
-
-    // Step 3: fetch results via worker (token stays in worker)
-    const resultsRes = await fetch(WORKER_URL + "/apify/results", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ datasetId }),
-      signal: AbortSignal.timeout(10000)
-    });
-
-    const items = await resultsRes.json();
-    console.log(platform+" items:", items.length, "sample:", JSON.stringify(items[0]||{}).slice(0,150));
-
-    if (!Array.isArray(items) || !items.length) return simulatePrices(platform,query);
-
-    const flat = items[0]?.items ? items.flatMap(r => r.items||[]) : items;
+    if (!res.ok) return simulatePrices("vinted",query);
+    const items = await res.json();
+    if (!Array.isArray(items)||!items.length) return simulatePrices("vinted",query);
+    const flat = items[0]?.items ? items.flatMap(r=>r.items||[]) : items;
     const prices = flat
-      .map(i => parseFloat(String(i.price||i.priceNumeric||i.currentPrice||i.salePrice||0).replace(/[^0-9.]/g,"")))
-      .filter(p => p > 0.5 && p < 5000);
-
-    if (!prices.length) {
-      console.warn(platform+": no prices. Keys:", Object.keys(flat[0]||{}).join(","));
-      return simulatePrices(platform,query);
-    }
-
-    const favorites = flat.map(i => i.favouriteCount||i.favourite_count||i.likes||0);
-    console.log(platform+" ✓", prices.length,"live prices:", prices.slice(0,5));
-    return { prices, favorites, count:prices.length, simulated:false };
-
-  } catch(e) {
-    console.warn(platform+" error:", e.message);
-    return simulatePrices(platform, query);
-  }
+      .map(i=>parseFloat(String(i.price||i.priceNumeric||0).replace(/[^0-9.]/g,"")))
+      .filter(p=>p>0.5&&p<5000);
+    if (!prices.length) return simulatePrices("vinted",query);
+    const favorites = flat.map(i=>i.favouriteCount||i.favourite_count||0);
+    return {prices,favorites,count:prices.length,simulated:false};
+  } catch(e) { return simulatePrices("vinted",query); }
 }
 
-
+// ═══════════════════════════════════════════════════════════════════
+// EBAY — via worker (official API when key set, scrape fallback)
+// ═══════════════════════════════════════════════════════════════════
 async function fetchEbay(query) {
-  // Routes through worker: uses eBay official API if EBAY_APP_ID set, else HTML scrape
   try {
     const res = await fetch(WORKER_URL+"/ebay", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({query}),
-      signal:AbortSignal.timeout(10000)
+      signal:AbortSignal.timeout(12000)
     });
-    if (!res.ok) return simulatePrices("ebay", query);
+    if (!res.ok) return simulatePrices("ebay",query);
     const data = await res.json();
-    if (!data.prices||data.prices.length<2) return simulatePrices("ebay", query);
-    return {prices:data.prices, favorites:data.prices.map(()=>0), count:data.prices.length, simulated:false, source:data.source};
-  } catch(e) { return simulatePrices("ebay", query); }
+    if (!data.prices||data.prices.length<2) return simulatePrices("ebay",query);
+    return {prices:data.prices,favorites:data.prices.map(()=>0),count:data.prices.length,simulated:false,source:data.source};
+  } catch(e) { return simulatePrices("ebay",query); }
 }
 
-async function fetchVinted(query)   { return fetchPlatform("vinted",   query); }
-async function fetchWallapop(query) { return fetchPlatform("wallapop", query); }
-async function fetchApify(platform, query) { return fetchPlatform(platform, query); }
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // AGGREGATION
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 function aggregate(platformData, item) {
-  const results = {};
-  let allPrices = [];
+  const results={};
+  let allPrices=[];
   for (const [p,d] of Object.entries(platformData)) {
     if (!d?.prices?.length) continue;
-    const s = [...d.prices].sort((a,b)=>a-b);
-    const median = s[Math.floor(s.length*.5)];
-    const p25    = s[Math.floor(s.length*.25)];
-    const avgFav = d.favorites.reduce((a,b)=>a+b,0)/(d.favorites.length||1);
-    results[p] = {median,p25,avg:s.reduce((a,b)=>a+b,0)/s.length,count:d.count,avgFav,simulated:d.simulated};
-    allPrices = allPrices.concat(d.prices);
+    const s=[...d.prices].sort((a,b)=>a-b);
+    const median=s[Math.floor(s.length*.5)];
+    const p25=s[Math.floor(s.length*.25)];
+    const avgFav=d.favorites.reduce((a,b)=>a+b,0)/(d.favorites.length||1);
+    results[p]={median,p25,avg:s.reduce((a,b)=>a+b,0)/s.length,count:d.count,avgFav,simulated:d.simulated};
+    allPrices=allPrices.concat(d.prices);
   }
   if (!allPrices.length) return null;
-  const W = {vinted:2.2,depop:1.5,stockx:1.8,ebay:1.1,wallapop:.7,leboncoin:.7,subito:.7};
+
+  // Vinted weighted higher (our sell target)
+  const W={vinted:2.5,ebay:1.2};
   let ws=0,wt=0;
-  for (const [p,d] of Object.entries(results)) { const w=W[p]||1; ws+=d.median*w; wt+=w; }
-  const wm = Math.round(ws/wt*100)/100;
-  const as = [...allPrices].sort((a,b)=>a-b);
-  const overallP25    = Math.round(as[Math.floor(as.length*.25)]*100)/100;
-  const overallMedian = Math.round(as[Math.floor(as.length*.5)]*100)/100;
-  const allFavs = Object.values(results).map(r=>r.avgFav);
-  const avgFav  = allFavs.reduce((a,b)=>a+b,0)/(allFavs.length||1);
-  const totalListings = Object.values(results).reduce((s,r)=>s+r.count,0);
-  const demand  = Math.min(avgFav/18,1);
-  const supply  = Math.max(1-totalListings/220,.1);
-  const bonus   = (item?.is_luxury?.15:0)+(item?.is_streetwear_sneaker?.10:0)+(item?.is_camera_watch_collectible?.08:0);
-  const prop    = Math.min(Math.round((demand*.45+supply*.38+bonus+.17)*100),96);
+  for (const [p,d] of Object.entries(results)){const w=W[p]||1;ws+=d.median*w;wt+=w;}
+  const wm=Math.round(ws/wt*100)/100;
+
+  const as=[...allPrices].sort((a,b)=>a-b);
+  const overallP25=Math.round(as[Math.floor(as.length*.25)]*100)/100;
+  const overallMedian=Math.round(as[Math.floor(as.length*.5)]*100)/100;
+  const allFavs=Object.values(results).map(r=>r.avgFav);
+  const avgFav=allFavs.reduce((a,b)=>a+b,0)/(allFavs.length||1);
+  const totalListings=Object.values(results).reduce((s,r)=>s+r.count,0);
+  const demand=Math.min(avgFav/18,1);
+  const supply=Math.max(1-totalListings/150,.1);
+  const bonus=(item?.is_luxury?.15:0)+(item?.is_streetwear_sneaker?.10:0)+(item?.is_camera_watch_collectible?.08:0);
+  const prop=Math.min(Math.round((demand*.45+supply*.38+bonus+.17)*100),96);
+
   return {
-    platforms:results, weightedMedian:wm, overallP25, overallMedian,
-    propensity:prop, totalListings,
+    platforms:results,weightedMedian:wm,overallP25,overallMedian,
+    propensity:prop,totalListings,
     buyThreshold:Math.round(wm*.45*100)/100,
     maybeThreshold:Math.round(wm*.60*100)/100,
     simulated:Object.values(results).some(r=>r.simulated),
-    enriching:false  // caller overrides this
+    enriching:false
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN SCAN PIPELINE
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// MAIN SCAN
+// ═══════════════════════════════════════════════════════════════════
 async function doScan() {
-  const now = Date.now();
-  if (scanning || now-lastScanTime < prefs.interval*1000) return;
-  const b64 = captureFrame();
-  if (!b64) { setErr("Camera not ready"); return; }
-  lastScanTime = now;
-  scanning = true;
+  const now=Date.now();
+  if (scanning||now-lastScanTime<prefs.interval*1000) return;
+  const b64=captureFrame();
+  if (!b64) return;
+  lastScanTime=now; scanning=true;
   setScanLine(true);
-  document.getElementById("cam-err").textContent = "";
-  document.getElementById("cam-err").className = "";
+  document.getElementById("cam-err").textContent="";
+  document.getElementById("cam-err").className="";
 
   try {
-    if (!WORKER_URL || WORKER_URL.includes("YOUR_WORKER")) {
-      throw new Error("WORKER_URL not configured in index.html");
+    setStatus("🔍 Identifying item...");
+    const item = await identifyItem(b64);
+    if (item.error||(!item.brand&&!item.subcategory)) {
+      setStatus("👁 No item detected — point closer");
+      setTimeout(()=>setStatus(prefs.autoScan?`⚡ Auto-scanning every ${prefs.interval}s`:"Tap 📸 to scan"),2500);
+      scanning=false; setScanLine(false); return;
     }
+    if (item.confidence<0.40||!item.brand) { scanning=false; setScanLine(false); showClarify(item,b64); return; }
 
-    setStatus("🔍 Sending to GPT-4o...");
-    let item;
-    try {
-      item = await identifyItem(b64);
-    } catch(apiErr) {
-      throw new Error("Vision API failed: " + apiErr.message);
-    }
-
-    console.log("Vision raw result:", item);
-
-    if (item.error) {
-      const msg = item.error === "no_item"
-        ? "👁 No item detected — point closer"
-        : "⚠️ API error: " + item.error;
-      setStatus(msg);
-      setTimeout(() => setStatus("Tap 📸 to scan"), 3000);
-      scanning = false; setScanLine(false); return;
-    }
-
-    if (!item.brand && !item.subcategory) {
-      setStatus("⚠️ Unrecognised — try different angle");
-      setTimeout(() => setStatus("Tap 📸 to scan"), 3000);
-      scanning = false; setScanLine(false); return;
-    }
-
-    if (item.confidence < 0.40 || !item.brand) {
-      scanning = false; setScanLine(false);
-      showClarify(item, b64);
-      return;
-    }
-
-    const label = [item.brand, item.model||item.subcategory].filter(Boolean).join(" ");
-    setStatus("✓ " + label + " — fetching prices...");
-    await fetchAndShow(item, b64);
-
+    const label=[item.brand,item.model||item.subcategory].filter(Boolean).join(" ");
+    setStatus("✓ "+label+" — fetching prices...");
+    await fetchAndShow(item,b64);
   } catch(e) {
-    console.error("doScan error:", e);
-    setErr("Error: " + e.message);
+    setErr("Error: "+e.message);
     setStatus("Tap 📸 to try again");
-  } finally {
-    scanning = false;
-    setScanLine(false);
-  }
+  } finally { scanning=false; setScanLine(false); }
 }
 
+function setScanLine(on) { document.getElementById("scan-line").style.display=on?"block":"none"; }
 
-function setScanLine(on) {
-  document.getElementById("scan-line").style.display = on ? "block" : "none";
-}
-
+// ═══════════════════════════════════════════════════════════════════
+// FETCH & SHOW — instant estimate, then real prices
+// ═══════════════════════════════════════════════════════════════════
 async function fetchAndShow(item, b64) {
   const q = item.search_query;
-  const raw = {};
 
-  // ── Phase 0: Show simulation INSTANTLY (<10ms) so user sees prices right away
-  const simRaw = {};
-  for (const p of prefs.platforms) simRaw[p] = simulatePrices(p, q);
+  // Phase 0: show estimate instantly
+  const simRaw = { vinted:simulatePrices("vinted",q), ebay:simulatePrices("ebay",q) };
   const simAgg = aggregate(simRaw, item);
   if (simAgg) {
-    currentItem   = item;
-    currentPrices = { ...simAgg, enriching: true, simulated: true };
-    currentB64    = b64;
-    currentScan   = {
-      id: Date.now(), ts: new Date().toISOString(), tsDisplay: new Date().toLocaleTimeString(),
-      brand: item.brand||"Unknown", model: item.model||"",
-      category: item.category||"other", subcategory: item.subcategory||"",
-      color: item.color||"", condition: item.condition_estimate||"good",
-      search_query: q, prices: simAgg, thumb: b64, decision: null, mktPrice: null
+    currentItem=item; currentB64=b64;
+    currentPrices={...simAgg,enriching:true,simulated:true};
+    currentScan={
+      id:Date.now(),ts:new Date().toISOString(),tsDisplay:new Date().toLocaleTimeString(),
+      brand:item.brand||"Unknown",model:item.model||"",
+      category:item.category||"other",subcategory:item.subcategory||"",
+      color:item.color||"",condition:item.condition_estimate||"good",
+      search_query:q,prices:simAgg,thumb:b64,decision:null,mktPrice:null
     };
     renderDetail();
     showScreen("detail");
   }
 
-  // ── Phase 1 + 2: Fire ALL real sources simultaneously, update UI as each arrives
-  // Start all platform fetches at once
-  const platformFetches = {};
-  for (const p of prefs.platforms) {
-    if (p === "stockx" && !item.is_streetwear_sneaker) continue;
-    if (p === "ebay") platformFetches[p] = fetchEbay(q);
-    else platformFetches[p] = fetchPlatform(p, q);
+  // Phase 1: fire both real fetches in parallel
+  const raw={};
+  await Promise.all([
+    fetchVinted(q).then(r=>{ raw.vinted=r; updatePricesLive(raw,item); }),
+    fetchEbay(q).then(r=>{ raw.ebay=r; updatePricesLive(raw,item); }),
+  ]);
+
+  // Final update
+  const finalAgg = aggregate(raw,item);
+  if (finalAgg) {
+    currentPrices={...finalAgg,enriching:false};
+    if (currentScan) { currentScan.prices=finalAgg; dbSave(currentScan).catch(()=>{}); }
+    dbAll().then(rows=>{ document.getElementById("scan-count").textContent=rows.length||""; });
+    updateDetailPrices();
   }
-
-  let realCount = 0;
-  const total = Object.keys(platformFetches).length;
-
-  // Update UI progressively as each platform resolves
-  const promises = Object.entries(platformFetches).map(async ([p, promise]) => {
-    try {
-      const result = await promise;
-      raw[p] = result;
-      if (!result.simulated) realCount++;
-    } catch(e) {
-      raw[p] = simRaw[p]; // keep simulation for failed platforms
-    }
-    // Update prices after each platform resolves
-    const agg = aggregate(raw, item);
-    if (agg) {
-      const stillLoading = realCount < total;
-      currentPrices = { ...agg, enriching: stillLoading };
-      if (currentScan) currentScan.prices = agg;
-      updateDetailPrices();
-    }
-  });
-
-  // Save to DB once all done
-  Promise.all(promises).then(() => {
-    const finalAgg = aggregate(raw, item);
-    if (finalAgg) {
-      currentPrices = { ...finalAgg, enriching: false };
-      if (currentScan) {
-        currentScan.prices = finalAgg;
-        dbSave(currentScan).catch(()=>{});
-      }
-      updateDetailPrices();
-    }
-  });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CLARIFY FLOW
-// ═══════════════════════════════════════════════════════════════════════════════
-let clarifyItem = null;
-let clarifyB64  = null;
-let clarifyStep = null;
-
-function showClarify(item, b64) {
-  clarifyItem = item; clarifyB64 = b64; clarifyStep = item.brand ? "condition" : "brand";
-
-  const overlay = document.createElement("div");
-  overlay.id = "clarify-overlay";
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(8,8,16,.95);z-index:200;display:flex;flex-direction:column;justify-content:flex-end";
-
-  const sheet = document.createElement("div");
-  sheet.style.cssText = "background:#0d0d1a;border-top:2px solid #00ff87;border-radius:20px 20px 0 0;padding:24px;padding-bottom:40px";
-
-  if (clarifyStep === "brand") {
-    const brands = ["Nike","Adidas","Zara","H&M","Levi's","Ralph Lauren","Mango","Pull&Bear","Casio","Seiko","Olympus","Canon","Unknown"];
-    sheet.innerHTML = `
-      <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Help me identify</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:4px">Which brand is it?</div>
-      <div style="font-size:12px;color:#555;margin-bottom:20px">Check the label · ${item.subcategory||""} · ${item.color||""}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        ${brands.map(b=>`<button onclick="pickBrand('${b}')" style="padding:12px 8px;border-radius:10px;border:1px solid #2a2a3e;background:transparent;color:#e8e8f0;font-size:13px;font-family:inherit;cursor:pointer">${b}</button>`).join("")}
-      </div>
-      <input id="brand-input" style="width:100%;background:#080810;border:1px solid #2a2a3e;border-radius:8px;padding:12px;color:#e8e8f0;font-size:14px;font-family:inherit;margin-bottom:12px" placeholder="Type brand name + Enter...">
-      <button onclick="closeClarify()" style="width:100%;padding:12px;background:transparent;border:1px solid #2a2a3e;border-radius:10px;color:#555;font-size:12px;font-family:inherit;cursor:pointer">← Cancel</button>`;
-    setTimeout(()=>{
-      const inp = document.getElementById("brand-input");
-      if (inp) inp.addEventListener("keydown", e=>{
-        if (e.key==="Enter"&&e.target.value.trim()) pickBrand(e.target.value.trim());
-      });
-    },100);
-  } else {
-    const conditions = [{v:"new",l:"New",e:"✨"},{v:"excellent",l:"Excellent",e:"⭐"},{v:"good",l:"Good",e:"👍"},{v:"fair",l:"Fair",e:"😐"},{v:"poor",l:"Poor",e:"🤕"}];
-    sheet.innerHTML = `
-      <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Almost there</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:4px">What's the condition?</div>
-      <div style="font-size:12px;color:#555;margin-bottom:20px">${item.brand||"Unknown"} · ${item.subcategory||""}</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
-        ${conditions.map(c=>`<button onclick="pickCondition('${c.v}')" style="padding:16px 4px;border-radius:10px;border:1px solid #2a2a3e;background:transparent;color:#e8e8f0;font-size:11px;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">${c.e}</span>${c.l}</button>`).join("")}
-      </div>`;
+function updatePricesLive(raw, item) {
+  const agg = aggregate(raw, item);
+  if (agg) {
+    currentPrices={...agg,enriching:true};
+    updateDetailPrices();
   }
+}
 
+// ═══════════════════════════════════════════════════════════════════
+// CLARIFY
+// ═══════════════════════════════════════════════════════════════════
+let clarifyItem=null,clarifyB64=null;
+
+function showClarify(item,b64) {
+  clarifyItem=item; clarifyB64=b64;
+  const overlay=document.createElement("div");
+  overlay.id="clarify-overlay";
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(8,8,16,.95);z-index:200;display:flex;flex-direction:column;justify-content:flex-end";
+  const sheet=document.createElement("div");
+  sheet.style.cssText="background:#0d0d1a;border-top:2px solid #00ff87;border-radius:20px 20px 0 0;padding:24px;padding-bottom:40px";
+  const brands=["Nike","Adidas","Zara","H&M","Levi's","Ralph Lauren","Mango","Casio","Seiko","Olympus","Canon","Unknown"];
+  sheet.innerHTML=`
+    <div style="font-size:10px;letter-spacing:3px;color:#8080a0;text-transform:uppercase;margin-bottom:6px">Help me identify</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px">Which brand is it?</div>
+    <div style="font-size:12px;color:#555;margin-bottom:20px">${item.subcategory||""} · ${item.color||""}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      ${brands.map(b=>`<button onclick="pickBrand('${b}')" style="padding:12px 8px;border-radius:10px;border:1px solid #2a2a3e;background:transparent;color:#e8e8f0;font-size:13px;font-family:inherit;cursor:pointer">${b}</button>`).join("")}
+    </div>
+    <input id="brand-input" style="width:100%;background:#080810;border:1px solid #2a2a3e;border-radius:8px;padding:12px;color:#e8e8f0;font-size:14px;font-family:inherit;margin-bottom:12px" placeholder="Type brand + Enter...">
+    <button onclick="closeClarify()" style="width:100%;padding:12px;background:transparent;border:1px solid #2a2a3e;border-radius:10px;color:#555;font-size:12px;font-family:inherit;cursor:pointer">← Cancel</button>`;
   overlay.appendChild(sheet);
   document.body.appendChild(overlay);
+  setTimeout(()=>{
+    const inp=document.getElementById("brand-input");
+    if(inp) inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.value.trim())pickBrand(e.target.value.trim());});
+  },100);
 }
-
 function pickBrand(brand) {
   closeClarify();
-  if (brand==="Unknown") brand = null;
-  clarifyItem = {...clarifyItem, brand};
-  if (brand) {
-    clarifyItem.search_query = [brand, clarifyItem.subcategory, clarifyItem.color].filter(Boolean).join(" ");
-  }
-  showClarify(clarifyItem, clarifyB64); // show condition step
+  clarifyItem={...clarifyItem,brand:brand==="Unknown"?null:brand};
+  if(clarifyItem.brand) clarifyItem.search_query=[clarifyItem.brand,clarifyItem.subcategory,clarifyItem.color].filter(Boolean).join(" ");
+  fetchAndShow(clarifyItem,clarifyB64);
 }
+function closeClarify() { const el=document.getElementById("clarify-overlay"); if(el) el.remove(); }
 
-function pickCondition(condition) {
-  closeClarify();
-  clarifyItem = {...clarifyItem, condition_estimate:condition};
-  fetchAndShow(clarifyItem, clarifyB64);
-}
-
-function closeClarify() {
-  const el = document.getElementById("clarify-overlay");
-  if (el) el.remove();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// RENDER DETAIL SCREEN
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// RENDER DETAIL
+// ═══════════════════════════════════════════════════════════════════
 function renderDetail() {
-  const item = currentItem;
-  const prices = currentPrices;
+  const item=currentItem, prices=currentPrices;
   if (!item||!prices) return;
-
-  // Thumb
-  const thumb = document.getElementById("detail-thumb");
-  thumb.src = currentB64 ? "data:image/jpeg;base64,"+currentB64 : "";
-
-  // Brand / model / sub
-  document.getElementById("detail-brand").textContent = (item.brand||"Unknown") + (item.model?" "+item.model:"");
-  document.getElementById("detail-sub").textContent = [item.subcategory,item.color,item.size_visible].filter(Boolean).join(" · ");
-
-  // Badges
-  const badges = document.getElementById("detail-badges");
-  badges.innerHTML = [
+  const thumb=document.getElementById("detail-thumb");
+  thumb.src=currentB64?"data:image/jpeg;base64,"+currentB64:"";
+  document.getElementById("detail-brand").textContent=(item.brand||"Unknown")+(item.model?" "+item.model:"");
+  document.getElementById("detail-sub").textContent=[item.subcategory,item.color,item.size_visible].filter(Boolean).join(" · ");
+  document.getElementById("detail-badges").innerHTML=[
     {t:item.condition_estimate,c:"green"},
     {t:item.category,c:"gray"},
     {t:Math.round((item.confidence||0)*100)+"%",c:"gray"},
   ].map(b=>`<span class="badge ${b.c}">${b.t}</span>`).join("");
-
+  document.getElementById("mkt-price").value="";
+  document.getElementById("signal-box").style.display="none";
   updateDetailPrices();
-  document.getElementById("mkt-price").value = "";
-  document.getElementById("signal-box").style.display = "none";
 }
 
 function updateDetailPrices() {
-  const prices = currentPrices;
+  const prices=currentPrices;
   if (!prices) return;
 
-  document.getElementById("detail-price").textContent = "€"+prices.weightedMedian;
-  document.getElementById("detail-range").textContent = `Range: €${prices.overallP25} – €${prices.overallMedian} median`;
+  document.getElementById("detail-price").textContent="€"+prices.weightedMedian;
+  document.getElementById("detail-range").textContent=`Range: €${prices.overallP25} – €${prices.overallMedian} median`;
 
-  const note = document.getElementById("detail-data-note");
-  const allPlatEntries = Object.entries(prices.platforms||{});
-  const realPlatforms  = allPlatEntries.filter(([p,d])=>!d.simulated).length;
-  const totalPlatforms = allPlatEntries.length;
+  const realCount=Object.values(prices.platforms||{}).filter(d=>!d.simulated).length;
+  const totalCount=Object.keys(prices.platforms||{}).length;
+  const note=document.getElementById("detail-note");
   if (prices.enriching) {
-    note.style.color = "#ffd600";
-    note.textContent = realPlatforms > 0
-      ? `⏳ ${realPlatforms}/${totalPlatforms} live — loading more...`
-      : "⏳ Fetching real prices from all platforms...";
-  } else if (realPlatforms === 0) {
-    note.style.color = "#888";
-    note.textContent = "⚡ Estimated prices (Apify may be slow — try again)";
-  } else if (realPlatforms < totalPlatforms) {
-    note.style.color = "#ffd600";
-    note.textContent = `✓ ${realPlatforms} live · ${totalPlatforms-realPlatforms} estimated`;
+    note.style.color="#ffd600";
+    note.textContent=realCount>0?`⏳ ${realCount}/${totalCount} live — loading more...`:"⏳ Fetching real prices...";
+  } else if (realCount===0) {
+    note.style.color="#888"; note.textContent="⚡ Estimated prices";
   } else {
-    note.style.color = "#00ff87";
-    note.textContent = `✓ All ${realPlatforms} platforms live`;
+    note.style.color="#00ff87"; note.textContent=`✓ Live from ${realCount} platform${realCount>1?"s":""}`;
   }
 
-  // Propensity
-  const propColor = prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444";
-  document.getElementById("prop-pct").textContent = prices.propensity+"%";
-  document.getElementById("prop-pct").style.color = propColor;
-  document.getElementById("prop-bar").style.width  = prices.propensity+"%";
-  document.getElementById("prop-bar").style.background = propColor;
-  document.getElementById("prop-listings").textContent = prices.totalListings+" active listings";
+  const propColor=prices.propensity>70?"#00ff87":prices.propensity>40?"#ffd600":"#ff4444";
+  document.getElementById("prop-pct").textContent=prices.propensity+"%";
+  document.getElementById("prop-pct").style.color=propColor;
+  document.getElementById("prop-bar").style.width=prices.propensity+"%";
+  document.getElementById("prop-bar").style.background=propColor;
+  document.getElementById("prop-listings").textContent=prices.totalListings+" active listings";
 
-  // Platform list
-  const list = document.getElementById("platforms-list");
-  list.innerHTML = Object.entries(prices.platforms).map(([p,d])=>`
+  document.getElementById("platforms-list").innerHTML=Object.entries(prices.platforms||{}).map(([p,d])=>`
     <div class="platform-row">
-      <span style="flex:1;font-size:12px;color:#8080a0">${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}</span>
-      <span style="font-size:15px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:8px">€${d.median}</span>
+      <span style="flex:1;font-size:13px;color:#8080a0">${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}</span>
+      <span style="font-size:17px;font-weight:700;color:${PLATFORMS[p]?.color||"#fff"};margin-right:8px">€${d.median}</span>
       <span style="font-size:10px;color:#444;margin-right:4px">${d.count} items</span>
-      <span style="font-size:9px;padding:1px 5px;border-radius:4px;background:${d.simulated?"#2a2a2a":"#00ff8720"};color:${d.simulated?"#555":"#00ff87"}">${d.simulated?"est":"live"}</span>
+      <span class="${d.simulated?"est-badge":"live-badge"}">${d.simulated?"est":"live"}</span>
     </div>`).join("");
 
-  // Thresholds
-  document.getElementById("thresholds").innerHTML =
+  document.getElementById("thresholds").innerHTML=
     `<span>✅ Buy if &lt;€${prices.buyThreshold}</span><span>⚠️ Maybe if &lt;€${prices.maybeThreshold}</span>`;
-
   updateSignal();
 }
 
 function updateSignal() {
-  const mp = parseFloat(document.getElementById("mkt-price").value);
-  const box = document.getElementById("signal-box");
-  if (!currentPrices||isNaN(mp)||mp<=0) { box.style.display="none"; return; }
-  const margin = Math.round((currentPrices.weightedMedian-mp)/mp*100);
+  const mp=parseFloat(document.getElementById("mkt-price").value);
+  const box=document.getElementById("signal-box");
+  if (!currentPrices||isNaN(mp)||mp<=0){box.style.display="none";return;}
+  const margin=Math.round((currentPrices.weightedMedian-mp)/mp*100);
   let label,icon,color;
-  if (mp<=currentPrices.buyThreshold)   { label="BUY";   icon="✅"; color="#00ff87"; }
-  else if (mp<=currentPrices.maybeThreshold) { label="MAYBE"; icon="⚠️"; color="#ffd600"; }
-  else { label="PASS"; icon="❌"; color="#ff4444"; }
+  if (mp<=currentPrices.buyThreshold)      {label="BUY";  icon="✅";color="#00ff87";}
+  else if(mp<=currentPrices.maybeThreshold){label="MAYBE";icon="⚠️";color="#ffd600";}
+  else                                      {label="PASS"; icon="❌";color="#ff4444";}
   box.style.display="block";
-  box.style.color=color; box.style.borderColor=color; box.style.background=color+"18";
-  box.innerHTML = icon+"<br>"+label+(margin>0?`<div style="font-size:10px;font-weight:400;margin-top:2px">+${margin}%</div>`:"");
+  box.style.color=color;box.style.borderColor=color;box.style.background=color+"18";
+  box.innerHTML=icon+"<br>"+label+(margin>0?`<div style="font-size:10px;font-weight:400;margin-top:2px">+${margin}%</div>`:"");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DECISIONS + HISTORY
-// ═══════════════════════════════════════════════════════════════════════════════
-function shareWhatsApp() {
-  if (!currentItem || !currentPrices) return;
-  const item    = currentItem;
-  const prices  = currentPrices;
-  const label   = [item.brand, item.model||item.subcategory].filter(Boolean).join(" ");
-  const prop    = prices.propensity;
-  const propTxt = prop > 70 ? "🔥 High demand" : prop > 40 ? "⚠️ Medium demand" : "📉 Low demand";
-  const mp      = document.getElementById("mkt-price").value;
-  const mktTxt  = mp ? `\nSeller asking: €${mp}` : "";
-  const buyTxt  = mp && prices.buyThreshold
-    ? (parseFloat(mp) <= prices.buyThreshold ? "\n✅ GOOD BUY" : parseFloat(mp) <= prices.maybeThreshold ? "\n⚠️ MAYBE" : "\n❌ PASS")
-    : "";
-
-  const platforms = Object.entries(prices.platforms)
-    .map(([p,d]) => `  ${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}: €${d.median}`)
-    .join("\n");
-
-  const msg = `🏷️ *ThriftLens Scan*
-
-*${label}*
-📦 ${item.subcategory||item.category} · ${item.condition_estimate}
-
-💰 *Avg resale: €${prices.weightedMedian}*
-📊 Range: €${prices.overallP25} – €${prices.overallMedian}${mktTxt}${buyTxt}
-
-${propTxt} (${prop}%)
-
-*By platform:*
-${platforms}
-
-_Scanned with ThriftLens · amentinho.github.io/thriftlens_`;
-
-  const url = "https://wa.me/?text=" + encodeURIComponent(msg);
-  window.open(url, "_blank");
-}
-
+// ═══════════════════════════════════════════════════════════════════
+// DECISIONS & WHATSAPP
+// ═══════════════════════════════════════════════════════════════════
 function recordDecision(decision) {
   if (currentScan) {
-    const mp = parseFloat(document.getElementById("mkt-price").value)||null;
-    currentScan = {...currentScan, decision, mktPrice:mp};
+    const mp=parseFloat(document.getElementById("mkt-price").value)||null;
+    currentScan={...currentScan,decision,mktPrice:mp};
     dbSave(currentScan).catch(()=>{});
   }
-  currentItem=null; currentPrices=null; currentScan=null; currentB64=null;
+  currentItem=null;currentPrices=null;currentScan=null;currentB64=null;
   showScreen("cam");
 }
 
+function shareWhatsApp() {
+  if (!currentItem||!currentPrices) return;
+  const item=currentItem, prices=currentPrices;
+  const label=[item.brand,item.model||item.subcategory].filter(Boolean).join(" ");
+  const prop=prices.propensity;
+  const propTxt=prop>70?"🔥 High demand":prop>40?"⚠️ Medium demand":"📉 Low demand";
+  const mp=document.getElementById("mkt-price").value;
+  const mktTxt=mp?`\nSeller asking: €${mp}`:"";
+  const buyTxt=mp&&prices.buyThreshold
+    ?(parseFloat(mp)<=prices.buyThreshold?"\n✅ GOOD BUY":parseFloat(mp)<=prices.maybeThreshold?"\n⚠️ MAYBE":"\n❌ PASS"):"";
+  const plats=Object.entries(prices.platforms)
+    .map(([p,d])=>`  ${PLATFORMS[p]?.emoji||""} ${PLATFORMS[p]?.name||p}: €${d.median} ${d.simulated?"(est)":"✓"}`)
+    .join("\n");
+  const msg=`🏷️ *ThriftLens Scan*\n\n*${label}*\n📦 ${item.subcategory||item.category} · ${item.condition_estimate}\n\n💰 *Avg resale: €${prices.weightedMedian}*\n📊 Range: €${prices.overallP25} – €${prices.overallMedian}${mktTxt}${buyTxt}\n\n${propTxt} (${prop}%)\n\n*By platform:*\n${plats}\n\n_Scanned with ThriftLens · amentinho.github.io/thriftlens_`;
+  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════════════════════════
 async function renderHistory() {
-  let rows = [];
-  try { rows = await dbAll(); } catch(e) {}
-  document.getElementById("scan-count").textContent = rows.length||"";
-
-  // Stats
+  let rows=[];
+  try{rows=await dbAll();}catch(e){}
+  document.getElementById("scan-count").textContent=rows.length||"";
   if (rows.length>0) {
-    const bought = rows.filter(r=>r.decision==="buy").length;
-    const passed = rows.filter(r=>r.decision==="pass").length;
-    const cats   = {};
-    rows.forEach(r=>{ cats[r.category]=(cats[r.category]||0)+1; });
-    const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
-    const grid   = document.getElementById("stats-grid");
+    const s=await dbStats().catch(()=>({total:rows.length,bought:0,passed:0,topCat:"—"}));
+    const grid=document.getElementById("stats-grid");
     grid.style.display="grid";
-    grid.innerHTML = [
-      {v:rows.length, l:"Scanned", c:"#e8e8f0"},
-      {v:bought,      l:"Bought",  c:"#00ff87"},
-      {v:passed,      l:"Passed",  c:"#ff4444"},
-      {v:topCat,      l:"Top",     c:"#ffd600"},
-    ].map(s=>`<div class="stat-box"><div class="stat-val" style="color:${s.c};font-size:${typeof s.v==='string'&&s.v.length>5?10:18}px">${s.v}</div><div class="stat-lbl">${s.l}</div></div>`).join("");
+    grid.innerHTML=[
+      {v:s.total,l:"Scanned",c:"#e8e8f0"},{v:s.bought,l:"Bought",c:"#00ff87"},
+      {v:s.passed,l:"Passed",c:"#ff4444"},{v:s.topCat,l:"Top",c:"#ffd600"},
+    ].map(x=>`<div class="stat-box"><div class="stat-val" style="color:${x.c};font-size:${typeof x.v==="string"&&x.v.length>5?10:18}px">${x.v}</div><div class="stat-lbl">${x.l}</div></div>`).join("");
   }
-
-  const list = document.getElementById("history-list");
-  if (!rows.length) { list.innerHTML='<div class="empty">No scans yet 🧺</div>'; return; }
-
-  list.innerHTML = rows.map(e=>{
-    const decColor = e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#555";
-    const decIcon  = e.decision==="buy"?"✓":e.decision==="pass"?"✗":"·";
-    const decBg    = e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#333";
+  const list=document.getElementById("history-list");
+  if (!rows.length){list.innerHTML='<div class="empty">No scans yet 🧺</div>';return;}
+  list.innerHTML=rows.map(e=>{
+    const decBg=e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#333";
+    const decIcon=e.decision==="buy"?"✓":e.decision==="pass"?"✗":"·";
+    const decColor=e.decision==="buy"?"#00ff87":e.decision==="pass"?"#ff4444":"#555";
     return `<div class="hist-card">
       <div class="hist-thumb-wrap">
         <img class="hist-thumb" src="data:image/jpeg;base64,${e.thumb}" alt=""/>
@@ -1040,51 +755,27 @@ async function renderHistory() {
   }).join("");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PREFERENCES UI
-// ═══════════════════════════════════════════════════════════════════════════════
-function savePrefs() {
-  try { localStorage.setItem("tl_prefs", JSON.stringify(prefs)); } catch(e){}
+// ═══════════════════════════════════════════════════════════════════
+// PREFERENCES
+// ═══════════════════════════════════════════════════════════════════
+function savePrefs(){try{localStorage.setItem("tl_prefs",JSON.stringify(prefs));}catch(e){}}
+function renderPrefs(){
+  document.getElementById("interval-chips").innerHTML=[2,3,5,8].map(v=>
+    `<button class="chip ${prefs.interval===v?"active":""}" onclick="setIntervalPref(${v})">${v}s</button>`).join("");
+  const tog=document.getElementById("autoscan-toggle");
+  const knob=document.getElementById("toggle-knob");
+  tog.style.background=prefs.autoScan?"#00ff87":"#333";
+  knob.style.transform=prefs.autoScan?"translateX(22px)":"translateX(0)";
 }
+function setIntervalPref(v){prefs.interval=v;savePrefs();renderPrefs();}
+function toggleAutoScan(){prefs.autoScan=!prefs.autoScan;savePrefs();renderPrefs();}
 
-function renderPrefs() {
-  // Interval chips
-  const chips = document.getElementById("interval-chips");
-  chips.innerHTML = [2,3,5,8].map(v=>
-    `<button class="chip ${prefs.interval===v?"active":""}" onclick="setInterval_(${v})">${v}s</button>`
-  ).join("");
-
-  // Auto-scan toggle
-  const tog = document.getElementById("autoscan-toggle");
-  const knob = document.getElementById("toggle-knob");
-  tog.style.background = prefs.autoScan?"#00ff87":"#333";
-  knob.style.transform  = prefs.autoScan?"translateX(22px)":"translateX(0)";
-
-  // Platform grid
-  const grid = document.getElementById("platform-grid");
-  grid.innerHTML = Object.entries(PLATFORMS).map(([k,p])=>{
-    const on = prefs.platforms.includes(k);
-    return `<button class="platform-btn" onclick="togglePlat('${k}')" style="border-color:${on?p.color:"#333"};background:${on?p.color+"22":"transparent"};color:${on?p.color:"#555"}">${p.emoji} ${p.name}</button>`;
-  }).join("");
-}
-
-function setInterval_(v) {
-  prefs.interval = v; savePrefs(); renderPrefs();
-}
-function toggleAutoScan() {
-  prefs.autoScan = !prefs.autoScan; savePrefs(); renderPrefs();
-}
-function togglePlat(k) {
-  if (prefs.platforms.includes(k)) prefs.platforms = prefs.platforms.filter(x=>x!==k);
-  else prefs.platforms.push(k);
-  savePrefs(); renderPrefs();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 renderPrefs();
 startCamera();
+dbAll().then(rows=>{ document.getElementById("scan-count").textContent=rows.length||""; }).catch(()=>{});
 </script>
 </body>
 </html>
