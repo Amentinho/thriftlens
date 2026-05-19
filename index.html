@@ -346,9 +346,16 @@ async function startCamera() {
   if (stream) return; // already running
   setStatus("Starting camera...");
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ideal:"environment"}, width:{ideal:1280} }
-    });
+    // Try rear camera first, fall back to any camera (desktop compatibility)
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{exact:"environment"}, width:{ideal:1280} }
+      });
+    } catch(e) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ width:{ideal:1280} }
+      });
+    }
     const video = document.getElementById("video");
     video.srcObject = stream;
     await video.play();
@@ -580,36 +587,63 @@ async function doScan() {
   const now = Date.now();
   if (scanning || now-lastScanTime < prefs.interval*1000) return;
   const b64 = captureFrame();
-  if (!b64) return;
+  if (!b64) { setErr("Camera not ready"); return; }
   lastScanTime = now;
   scanning = true;
-
   setScanLine(true);
-  setStatus("🔍 Identifying item...");
+  document.getElementById("cam-err").textContent = "";
+  document.getElementById("cam-err").className = "";
 
   try {
-    const item = await identifyItem(b64);
-    if (item.error || (!item.brand && !item.subcategory)) {
-      setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
+    if (!WORKER_URL || WORKER_URL.includes("YOUR_WORKER")) {
+      throw new Error("WORKER_URL not configured in index.html");
+    }
+
+    setStatus("🔍 Sending to GPT-4o...");
+    let item;
+    try {
+      item = await identifyItem(b64);
+    } catch(apiErr) {
+      throw new Error("Vision API failed: " + apiErr.message);
+    }
+
+    console.log("Vision raw result:", item);
+
+    if (item.error) {
+      const msg = item.error === "no_item"
+        ? "👁 No item detected — point closer"
+        : "⚠️ API error: " + item.error;
+      setStatus(msg);
+      setTimeout(() => setStatus("Tap 📸 to scan"), 3000);
       scanning = false; setScanLine(false); return;
     }
 
-    // Show clarify if needed
+    if (!item.brand && !item.subcategory) {
+      setStatus("⚠️ Unrecognised — try different angle");
+      setTimeout(() => setStatus("Tap 📸 to scan"), 3000);
+      scanning = false; setScanLine(false); return;
+    }
+
     if (item.confidence < 0.55 || !item.brand) {
       scanning = false; setScanLine(false);
       showClarify(item, b64);
       return;
     }
 
-    setStatus("📡 Fetching prices...");
+    const label = [item.brand, item.model||item.subcategory].filter(Boolean).join(" ");
+    setStatus("✓ " + label + " — fetching prices...");
     await fetchAndShow(item, b64);
+
   } catch(e) {
+    console.error("doScan error:", e);
     setErr("Error: " + e.message);
+    setStatus("Tap 📸 to try again");
   } finally {
     scanning = false;
     setScanLine(false);
   }
 }
+
 
 function setScanLine(on) {
   document.getElementById("scan-line").style.display = on ? "block" : "none";
