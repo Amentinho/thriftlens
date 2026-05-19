@@ -362,7 +362,7 @@ async function identifyItem(b64) {
       {type:"text",text:VISION_PROMPT},
       {type:"image_url",image_url:{url:"data:image/jpeg;base64,"+b64,detail:"low"}}
     ]}]}),
-    signal:AbortSignal.timeout(20000)
+    // timeout via fetchWithTimeout
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message||JSON.stringify(data.error));
@@ -409,15 +409,14 @@ function simulatePrices(platform, query) {
 // ═══════════════════════════════════════════════════════════════════
 async function fetchVinted(query) {
   try {
-    const res = await fetch(WORKER_URL+"/apify", {
+    const res = await fetchWithTimeout(WORKER_URL+"/apify", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         actor:"kazkn~vinted-smart-scraper",
         input:{ mode:"SEARCH", query:query, countries:["es","fr","de","it","nl","pt"], maxItems:20 }
       }),
-      signal:AbortSignal.timeout(60000)  // 60s — actor needs ~10-30s on cold start
-    });
+    }, 65000);  // 65s timeout
     if (!res.ok) { console.warn("Vinted HTTP", res.status); return simulatePrices("vinted",query); }
     const items = await res.json();
     console.log("Vinted raw count:", items?.length, "first:", JSON.stringify(items?.[0]).slice(0,100));
@@ -438,12 +437,11 @@ async function fetchVinted(query) {
 // ═══════════════════════════════════════════════════════════════════
 async function fetchEbay(query) {
   try {
-    const res = await fetch(WORKER_URL+"/ebay", {
+    const res = await fetchWithTimeout(WORKER_URL+"/ebay", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({query}),
-      signal:AbortSignal.timeout(20000)
-    });
+    }, 20000);
     if (!res.ok) { console.warn("eBay HTTP", res.status); return simulatePrices("ebay",query); }
     const data = await res.json();
     console.log("eBay source:", data.source, "count:", data.count);
@@ -533,10 +531,18 @@ function setScanLine(on) { document.getElementById("scan-line").style.display=on
 // ═══════════════════════════════════════════════════════════════════
 // FETCH & SHOW — instant estimate, then real prices
 // ═══════════════════════════════════════════════════════════════════
+// Timeout helper — works on all Safari versions
+function fetchWithTimeout(url, opts, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout after "+ms+"ms")), ms);
+    fetch(url, opts).then(r => { clearTimeout(timer); resolve(r); }).catch(e => { clearTimeout(timer); reject(e); });
+  });
+}
+
 async function fetchAndShow(item, b64) {
   const q = item.search_query;
 
-  // Phase 0: show estimate instantly
+  // Phase 0: show estimate instantly + show loading note
   const simRaw = { vinted:simulatePrices("vinted",q), ebay:simulatePrices("ebay",q) };
   const simAgg = aggregate(simRaw, item);
   if (simAgg) {
@@ -551,13 +557,35 @@ async function fetchAndShow(item, b64) {
     };
     renderDetail();
     showScreen("detail");
+    // Show loading status immediately
+    const note = document.getElementById("detail-note");
+    if (note) { note.style.color="#ffd600"; note.textContent="⏳ Fetching real prices (30-60s)..."; }
   }
 
-  // Phase 1: fire both real fetches in parallel
+  // Phase 1: fire both real fetches in parallel, update as each arrives
   const raw={};
+  let doneCount=0;
+
+  const doFetch = async (platform, fetchFn) => {
+    try {
+      const result = await fetchFn(q);
+      raw[platform] = result;
+      doneCount++;
+      const note = document.getElementById("detail-note");
+      if (note && result && !result.simulated) {
+        note.style.color="#ffd600";
+        note.textContent="⏳ Got "+platform+" ("+doneCount+"/2) — waiting for more...";
+      }
+      updatePricesLive(raw, item);
+    } catch(e) {
+      raw[platform] = simulatePrices(platform, q);
+      doneCount++;
+    }
+  };
+
   await Promise.all([
-    fetchVinted(q).then(r=>{ raw.vinted=r; updatePricesLive(raw,item); }),
-    fetchEbay(q).then(r=>{ raw.ebay=r; updatePricesLive(raw,item); }),
+    doFetch("vinted", fetchVinted),
+    doFetch("ebay",   fetchEbay),
   ]);
 
   // Final update
