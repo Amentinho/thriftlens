@@ -857,24 +857,28 @@ let barcodeMode = false;
 
 let barcodeModeActive = false;
 
-async function startBarcodeMode() {
+function startBarcodeMode() {
+  const btn = document.getElementById("barcode-btn");
   if (barcodeModeActive) {
+    // Cancel barcode mode — go back to normal
     barcodeModeActive = false;
-    const btn = document.getElementById("barcode-btn");
     btn.style.background = "#ffd600"; btn.textContent = "📦 BARCODE";
+    // Restore auto-scan if enabled
+    clearInterval(scanTimer);
+    if (prefs.autoScan) scanTimer = setInterval(doScan, prefs.interval*1000);
+    else document.getElementById("manual-btn").style.display = "flex";
     setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
     return;
   }
+  // Enter barcode mode — camera stays on, user taps 📸 to capture
   barcodeModeActive = true;
-  const btn = document.getElementById("barcode-btn");
   btn.style.background = "#ff4444"; btn.textContent = "⏹ CANCEL";
-  setStatus("📦 Point at barcode/ISBN then tap 📸");
-  // Switch to manual mode so user taps when ready
-  clearInterval(scanTimer);
-  document.getElementById("manual-btn").style.display = "flex";
+  clearInterval(scanTimer);  // pause auto-scan
+  document.getElementById("manual-btn").style.display = "flex";  // show manual button
+  setStatus("📦 Aim at barcode then tap 📸");
 }
 
-async function stopBarcodeMode() {
+function stopBarcodeMode() {
   barcodeModeActive = false;
   const btn = document.getElementById("barcode-btn");
   if (btn) { btn.style.background = "#ffd600"; btn.textContent = "📦 BARCODE"; }
