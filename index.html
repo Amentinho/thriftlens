@@ -219,6 +219,7 @@ try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem("tl_prefs")||"{}") 
 
 let currentItem=null, currentPrices=null, currentScan=null, currentB64=null;
 let scanning=false, lastScanTime=0, scanTimer=null, stream=null;
+let barcodeModeActive=false;
 
 // ═══════════════════════════════════════════════════════════════════
 // INDEXEDDB
@@ -854,8 +855,6 @@ function toggleAutoScan(){prefs.autoScan=!prefs.autoScan;savePrefs();renderPrefs
 let barcodeDetector = null;
 let barcodeInterval = null;
 let barcodeMode = false;
-
-let barcodeModeActive = false;
 
 function startBarcodeMode() {
   const btn = document.getElementById("barcode-btn");
