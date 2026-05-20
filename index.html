@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v1779262967 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -139,6 +139,7 @@
       <div style="font-size:48px;font-weight:700;line-height:1" id="detail-price">—</div>
       <div id="detail-range" style="font-size:12px;color:#555;margin-top:8px"></div>
       <div id="detail-note" class="enrich-note" style="margin-top:8px"></div>
+      <div id="detail-retail" style="display:none;font-size:11px;color:#8080a0;margin-top:4px"></div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -938,12 +939,14 @@ async function lookupBarcode(code) {
     if (book) {
       const title   = book.title || "";
       const authors = (book.authors||[]).map(a=>a.name).join(", ");
+      // Try to get retail price from Open Library
+      const retailPrice = book.price?.amount || null;
       item = {
         brand: authors||null, model: title, category:"book", subcategory:"book",
         color:"multicolor", condition_estimate:"good", size_visible:null, gender:"na",
         search_query: title.split(" ").slice(0,4).join(" ")+" libro",
         confidence:0.98, is_luxury:false, is_streetwear_sneaker:false, is_camera_watch_collectible:false,
-        isbn:code, year:book.publish_date||"", source:"openlibrary"
+        isbn:code, year:book.publish_date||"", source:"openlibrary", retailPrice
       };
       console.log("Open Library:", title, authors);
     }
@@ -958,14 +961,16 @@ async function lookupBarcode(code) {
       if (vol) {
         const title   = vol.title || "";
         const authors = (vol.authors||[]).join(", ");
+        const retailPrice = vol.saleInfo?.listPrice?.amount || vol.saleInfo?.retailPrice?.amount || null;
         item = {
           brand: authors||null, model: title, category:"book", subcategory:"book",
           color:"multicolor", condition_estimate:"good", size_visible:null, gender:"na",
           search_query: title.split(" ").slice(0,4).join(" ")+" libro",
           confidence:0.97, is_luxury:false, is_streetwear_sneaker:false, is_camera_watch_collectible:false,
-          isbn:code, source:"google_books"
+          isbn:code, source:"google_books", retailPrice,
+          pageCount: vol.pageCount||null, publisher: vol.publisher||null
         };
-        console.log("Google Books:", title, authors);
+        console.log("Google Books:", title, authors, "retail:", retailPrice);
       }
     } catch(e) { console.warn("Google Books:", e.message); }
   }
