@@ -10,7 +10,6 @@
   <title>ThriftLens</title>
   <link rel="manifest" href="manifest.json"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;background:#080810;overflow:hidden}
@@ -540,6 +539,9 @@ function aggregate(platformData, item) {
 // MAIN SCAN
 // ═══════════════════════════════════════════════════════════════════
 async function doScan() {
+  // If barcode mode active, use AI to read barcode instead of identifying item
+  if (barcodeModeActive) { await scanBarcode(); return; }
+
   const now=Date.now();
   if (scanning||now-lastScanTime<prefs.interval*1000) return;
   const b64=captureFrame();
@@ -853,70 +855,70 @@ let barcodeDetector = null;
 let barcodeInterval = null;
 let barcodeMode = false;
 
-let html5QrScanner = null;
-let barcodeScannerActive = false;
+let barcodeModeActive = false;
 
 async function startBarcodeMode() {
-  if (barcodeScannerActive) { stopBarcodeMode(); return; }
-
-  if (typeof Html5Qrcode === "undefined") {
-    setErr("Scanner loading... try again in 2 seconds.");
+  if (barcodeModeActive) {
+    barcodeModeActive = false;
+    const btn = document.getElementById("barcode-btn");
+    btn.style.background = "#ffd600"; btn.textContent = "📦 BARCODE";
+    setStatus(prefs.autoScan ? `⚡ Auto-scanning every ${prefs.interval}s` : "Tap 📸 to scan");
     return;
   }
-
-  stopCamera();
-
-  const overlay = document.createElement("div");
-  overlay.id = "barcode-overlay";
-  overlay.style.cssText = "position:fixed;inset:0;background:#080810;z-index:300;display:flex;flex-direction:column;font-family:inherit";
-  overlay.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1a1a2e">
-      <span style="font-size:13px;color:#ffd600;letter-spacing:2px;font-weight:700">📦 SCAN BARCODE</span>
-      <button onclick="stopBarcodeMode()" style="padding:8px 16px;background:#ff4444;border:none;border-radius:8px;color:#fff;font-size:13px;font-family:inherit;cursor:pointer;font-weight:700">✕ CLOSE</button>
-    </div>
-    <div id="qr-reader" style="flex:1;width:100%;max-width:430px;margin:0 auto"></div>
-    <div style="padding:12px;font-size:11px;color:#555;text-align:center">Point at ISBN/EAN barcode — keep steady and well-lit</div>
-  `;
-  document.body.appendChild(overlay);
-  barcodeScannerActive = true;
-
-  try {
-    html5QrScanner = new Html5Qrcode("qr-reader");
-    await html5QrScanner.start(
-      { facingMode: "environment" },
-      { fps:10, qrbox:{width:280,height:120},
-        formatsToSupport:[
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-        ]
-      },
-      async (code) => {
-        console.log("Barcode:", code);
-        await stopBarcodeMode();
-        await lookupBarcode(code);
-      },
-      () => {}
-    );
-  } catch(e) {
-    console.error("Scanner error:", e);
-    stopBarcodeMode();
-    setErr("Camera error: " + e.message);
-    startCamera();
-  }
+  barcodeModeActive = true;
+  const btn = document.getElementById("barcode-btn");
+  btn.style.background = "#ff4444"; btn.textContent = "⏹ CANCEL";
+  setStatus("📦 Point at barcode/ISBN then tap 📸");
+  // Switch to manual mode so user taps when ready
+  clearInterval(scanTimer);
+  document.getElementById("manual-btn").style.display = "flex";
 }
 
 async function stopBarcodeMode() {
-  barcodeScannerActive = false;
-  if (html5QrScanner) {
-    try { await html5QrScanner.stop(); html5QrScanner.clear(); } catch(e) {}
-    html5QrScanner = null;
+  barcodeModeActive = false;
+  const btn = document.getElementById("barcode-btn");
+  if (btn) { btn.style.background = "#ffd600"; btn.textContent = "📦 BARCODE"; }
+}
+
+async function scanBarcode() {
+  const b64 = captureFrame();
+  if (!b64) return;
+
+  barcodeModeActive = false;
+  stopBarcodeMode();
+  document.getElementById("manual-btn").style.display = prefs.autoScan ? "none" : "flex";
+  setStatus("🔍 Reading barcode with AI...");
+  setScanLine(true);
+
+  try {
+    const res = await fetchWithTimeout(WORKER_URL+"/vision", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({messages:[{role:"user",content:[
+        {type:"text", text:"Look at this image and find any barcode, ISBN, EAN, or UPC number. Return ONLY JSON: {"barcode":"THE_EXACT_NUMBER","type":"isbn"} or {"barcode":null,"type":"none"} if no barcode visible. Read the digits precisely."},
+        {type:"image_url", image_url:{url:"data:image/jpeg;base64,"+b64, detail:"high"}}
+      ]}]}),
+    }, 15000);
+
+    const data = await res.json();
+    const text = (data.choices?.[0]?.message?.content||"{}").replace(/```json|```/g,"").trim();
+    const result = JSON.parse(text);
+    console.log("AI barcode result:", result);
+
+    if (result.barcode && result.barcode !== "null" && result.barcode.length >= 8) {
+      setStatus("✓ " + result.barcode + " — looking up...");
+      await lookupBarcode(result.barcode);
+    } else {
+      setErr("No barcode found. Get closer and ensure barcode is well-lit.");
+      setStatus("Tap 📸 to try again");
+      if (prefs.autoScan) scanTimer = setInterval(doScan, prefs.interval*1000);
+    }
+  } catch(e) {
+    setErr("Error: " + e.message);
+    if (prefs.autoScan) scanTimer = setInterval(doScan, prefs.interval*1000);
+  } finally {
+    setScanLine(false);
   }
-  const overlay = document.getElementById("barcode-overlay");
-  if (overlay) overlay.remove();
-  startCamera();
 }
 
 
