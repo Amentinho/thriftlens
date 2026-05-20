@@ -898,7 +898,7 @@ async function scanBarcode() {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({messages:[{role:"user",content:[
-        {type:"text", text:"Look at this image and find any barcode, ISBN, EAN, or UPC number. Return ONLY JSON: {"barcode":"THE_EXACT_NUMBER","type":"isbn"} or {"barcode":null,"type":"none"} if no barcode visible. Read the digits precisely."},
+        {type:"text", text:"Find any barcode or ISBN number in this image. Reply with ONLY valid JSON with keys barcode (the number as string or null) and type (isbn, ean, upc, or none). No markdown."},
         {type:"image_url", image_url:{url:"data:image/jpeg;base64,"+b64, detail:"high"}}
       ]}]}),
     }, 15000);
