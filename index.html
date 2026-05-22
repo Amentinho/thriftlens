@@ -339,29 +339,37 @@ function setErr(msg) { const el=document.getElementById("cam-err"); if(el){el.cl
 // ═══════════════════════════════════════════════════════════════════
 // VISION PROMPT
 // ═══════════════════════════════════════════════════════════════════
-const VISION_PROMPT = `You are a secondhand resale expert. Identify the item in the image for pricing.
+const VISION_PROMPT = `You are an expert secondhand resale appraiser. Your job: identify items PRECISELY for pricing.
+
+RULES BY CATEGORY:
+- WATCHES: Read the dial text carefully. Extract brand + exact model name + reference if visible. "Hugo Boss HB1513" not "Hugo Boss watch". Check caseback too.
+- CAMERAS: Brand + exact model. "Olympus XA" not "Olympus camera". Read body markings.
+- CLOTHING: Brand + garment + fit + color. "Levis 501 straight jeans blue" not "blue jeans".
+- SHOES: Brand + model + colorway. "Nike Air Max 90 white" not "white sneakers".
+- BOOKS: Author + title. "Murakami Norwegian Wood" not "japanese novel".
+- ELECTRONICS: Brand + full model number. "Sony WH-1000XM4" not "Sony headphones".
+- ANTIQUES: Maker marks, style period, material, any visible signatures.
+- VINYL: Artist + album title + year if visible.
+
 Return ONLY valid JSON, no markdown:
 {
-  "brand": "exact brand/author or null",
-  "model": "exact model/title or null",
+  "brand": "exact brand",
+  "model": "exact model name and reference number if visible",
   "category": "clothing|shoes|bag|camera|watch|book|vinyl|electronics|antique|toy|jewelry|accessory|other",
-  "subcategory": "specific type e.g. jeans, novel, film camera",
-  "color": "main color",
+  "subcategory": "specific type",
+  "color": "color and material e.g. black leather",
   "condition_estimate": "new|excellent|good|fair|poor",
   "size_visible": null,
   "gender": "men|women|unisex|unknown|na",
-  "search_query": "specific title/model + category word. Rules: BOOKS→ key title words + libro/book (e.g. 'celda luciernaga libro' or 'confessions forty fup book'). CAMERAS→ brand + model + camera (e.g. 'Olympus XA camera'). CLOTHING→ brand + type (e.g. 'Levi 501 jeans'). WATCHES→ brand + model + watch (e.g. 'Casio G-Shock watch'). VINYL→ artist + album + vinyl. Always include the specific title or model — never use ONLY generic words like libro, book, camera, watch alone.",
+  "search_query": "brand + exact model + category word. Max 6 words. e.g.: Hugo Boss HB1513 watch, Olympus XA camera, Levis 501 jeans, Nike Air Max 90",
+  "notable_detail": "model number, reference, edition, material marking or null",
   "confidence": 0.9,
   "is_luxury": false,
   "is_streetwear_sneaker": false,
   "is_camera_watch_collectible": false
 }
-Always return full JSON. Only {"error":"no_item"} if image is completely blank.`;
+Return {"error":"no_item"} ONLY if image is completely blank.`;
 
-async function identifyItem(b64) {
-  const res = await fetch(WORKER_URL+"/vision", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
     body:JSON.stringify({messages:[{role:"user",content:[
       {type:"text",text:VISION_PROMPT},
       {type:"image_url",image_url:{url:"data:image/jpeg;base64,"+b64,detail:"low"}}
@@ -588,7 +596,9 @@ function fetchWithTimeout(url, opts, ms) {
 }
 
 async function fetchAndShow(item, b64) {
-  const q = item.search_query;
+  // Use ISBN for book searches — exact match on Vinted/eBay
+  const q = (item.isbn && item.category === "book") ? item.isbn : item.search_query;
+  console.log("Search query:", q, item.isbn ? "(ISBN)" : "(text)");
 
   // Phase 0: show estimate instantly + show loading note
   const simRaw = { vinted:simulatePrices("vinted",q), ebay:simulatePrices("ebay",q) };
@@ -700,7 +710,9 @@ function renderDetail() {
   const thumb=document.getElementById("detail-thumb");
   thumb.src=currentB64?"data:image/jpeg;base64,"+currentB64:"";
   document.getElementById("detail-brand").textContent=(item.brand||"Unknown")+(item.model?" "+item.model:"");
-  document.getElementById("detail-sub").textContent=[item.subcategory,item.color,item.size_visible].filter(Boolean).join(" · ");
+  const subParts = [item.subcategory, item.color, item.size_visible].filter(Boolean);
+  if (item.notable_detail) subParts.push("· " + item.notable_detail);
+  document.getElementById("detail-sub").textContent = subParts.join(" · ");
   const sourceBadge = item.isbn ? `ISBN ${item.isbn.slice(-4)}` : item.barcode ? `EAN` : Math.round((item.confidence||0)*100)+"%";
   document.getElementById("detail-badges").innerHTML=[
     {t:item.condition_estimate,c:"green"},
